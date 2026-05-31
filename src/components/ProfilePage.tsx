@@ -30,21 +30,25 @@ export default function ProfilePage({ user, onRefreshUser, showToast }: ProfileP
     });
 
     // Capture Redirect result if any
-    getRedirectResult(auth)
-      .then((result) => {
-        if (result) {
-          showToast(`Logged into Google via Redirect: ${result.user.displayName}`, 'success');
-          StoreDB.syncFromCloud(user.uid).then((cloudProfile) => {
-            if (cloudProfile) {
-              onRefreshUser();
-              showToast('Cloud database synchronized successfully!', 'success');
-            }
-          });
-        }
-      })
-      .catch((err) => {
-        console.error("Redirect login result error:", err);
-      });
+    try {
+      getRedirectResult(auth)
+        .then((result) => {
+          if (result) {
+            showToast(`Logged into Google via Redirect: ${result.user.displayName}`, 'success');
+            StoreDB.syncFromCloud(user.uid).then((cloudProfile) => {
+              if (cloudProfile) {
+                onRefreshUser();
+                showToast('Cloud database synchronized successfully!', 'success');
+              }
+            });
+          }
+        })
+        .catch((err) => {
+          console.error("Redirect login result error:", err);
+        });
+    } catch (err) {
+      console.warn("Google Google auth redirect result check blocked by iframe storage sandbox policy:", err);
+    }
 
     return () => unsubscribe();
   }, []);

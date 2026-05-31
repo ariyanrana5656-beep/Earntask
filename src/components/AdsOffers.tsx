@@ -43,8 +43,14 @@ export default function AdsOffers({ user, onRefreshUser, showToast }: AdsOffersP
     const historyKey = `te_adhistory_${user.uid}`;
     const cdKey = `te_adcooldowns_${user.uid}`;
     
-    setAdHistory(JSON.parse(localStorage.getItem(historyKey) || '[]'));
-    setCooldowns(JSON.parse(localStorage.getItem(cdKey) || '{}'));
+    try {
+      setAdHistory(JSON.parse(localStorage.getItem(historyKey) || '[]'));
+      setCooldowns(JSON.parse(localStorage.getItem(cdKey) || '{}'));
+    } catch (e) {
+      console.warn("localStorage restricted; initializing empty logs for ad center.", e);
+      setAdHistory([]);
+      setCooldowns({});
+    }
   }, [user.uid]);
 
   // Handle ticking down the active running ad simulation
@@ -80,7 +86,11 @@ export default function AdsOffers({ user, onRefreshUser, showToast }: AdsOffersP
           }
         });
         if (flag) {
-          localStorage.setItem(`te_adcooldowns_${user.uid}`, JSON.stringify(next));
+          try {
+            localStorage.setItem(`te_adcooldowns_${user.uid}`, JSON.stringify(next));
+          } catch (e) {
+            // Silently swallow restricted iframe write errors
+          }
           return next;
         }
         clearInterval(interval);
@@ -150,7 +160,11 @@ export default function AdsOffers({ user, onRefreshUser, showToast }: AdsOffersP
       // Append cooldown
       const nextCooldowns = { ...cooldowns, [activeAd.id]: Date.now() + activeAd.cooldownSeconds * 1000 };
       setCooldowns(nextCooldowns);
-      localStorage.setItem(`te_adcooldowns_${user.uid}`, JSON.stringify(nextCooldowns));
+      try {
+        localStorage.setItem(`te_adcooldowns_${user.uid}`, JSON.stringify(nextCooldowns));
+      } catch (e) {
+        // Safe fallback when storage access is restricted
+      }
 
       // Append watch history
       const nextHistory = [
@@ -158,7 +172,11 @@ export default function AdsOffers({ user, onRefreshUser, showToast }: AdsOffersP
         ...adHistory
       ].slice(0, 10);
       setAdHistory(nextHistory);
-      localStorage.setItem(`te_adhistory_${user.uid}`, JSON.stringify(nextHistory));
+      try {
+        localStorage.setItem(`te_adhistory_${user.uid}`, JSON.stringify(nextHistory));
+      } catch (e) {
+        // Safe fallback when storage access is restricted
+      }
 
       showToast(`Success! Earned ${coinEarned} Coins standard ad revenue.`, 'success');
       onRefreshUser();

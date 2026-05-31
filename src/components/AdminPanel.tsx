@@ -645,7 +645,11 @@ export default function AdminPanel({
         }]
       });
 
-      localStorage.setItem('taskearn_pro_db_v2', JSON.stringify(db));
+      try {
+        localStorage.setItem('taskearn_pro_db_v2', JSON.stringify(db));
+      } catch (e) {
+        console.warn("Storage restricted; unable to save diagnostic seed changes to local cache.");
+      }
       showToast('🎯 Diagnostic Seeding: Inserted task screenshot & chat ticket!', 'success');
       loadAdminCollections();
     }
@@ -653,7 +657,11 @@ export default function AdminPanel({
 
   const handleHardFactoryReset = () => {
     if (confirm('🚨 CRITICAL DANGER: This resets all users, completed offers, configurations back to factory preloads. Proceed?')) {
-      localStorage.removeItem('taskearn_pro_db_v2');
+      try {
+        localStorage.removeItem('taskearn_pro_db_v2');
+      } catch (e) {
+        console.warn("Storage restricted; unable to remove cached database.");
+      }
       showToast('Simulation database cleared and reset back to preloads!', 'success');
       loadAdminCollections();
       onRefreshUser();

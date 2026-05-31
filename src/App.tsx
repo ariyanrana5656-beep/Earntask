@@ -119,27 +119,31 @@ export default function App() {
 
   // 1. Initial login handler with Telegram Mini App auto-detect bindings
   useEffect(() => {
-    // Collect parameters from official Telegram Mini App WebApp SDK if available
-    const tg = (window as any).Telegram?.WebApp;
-    if (tg) {
-      tg.ready();
-      tg.expand();
-      
-      const tgUser = tg.initDataUnsafe?.user;
-      if (tgUser) {
-        const profile = StoreDB.createOrUpdateTelegramUser({
-          id: String(tgUser.id),
-          username: tgUser.username,
-          first_name: tgUser.first_name,
-          last_name: tgUser.last_name,
-          is_premium: !!tgUser.is_premium,
-          language_code: tgUser.language_code,
-          photo_url: tgUser.photo_url
-        });
-        setCurrentUser(profile);
-        setCurrentLang(profile.language);
-        return;
+    try {
+      // Collect parameters from official Telegram Mini App WebApp SDK if available
+      const tg = (window as any).Telegram?.WebApp;
+      if (tg) {
+        if (typeof tg.ready === 'function') tg.ready();
+        if (typeof tg.expand === 'function') tg.expand();
+        
+        const tgUser = tg.initDataUnsafe?.user;
+        if (tgUser) {
+          const profile = StoreDB.createOrUpdateTelegramUser({
+            id: String(tgUser.id),
+            username: tgUser.username,
+            first_name: tgUser.first_name || 'User',
+            last_name: tgUser.last_name || '',
+            is_premium: !!tgUser.is_premium,
+            language_code: tgUser.language_code || 'en',
+            photo_url: tgUser.photo_url || ''
+          });
+          setCurrentUser(profile);
+          setCurrentLang(profile.language);
+          return;
+        }
       }
+    } catch (e) {
+      console.warn("Telegram WebApp SDK safely caught exception on init:", e);
     }
 
     // Default simulation login loader
@@ -147,14 +151,53 @@ export default function App() {
   }, [activeSimProfileIdx]);
 
   const handleRefreshUser = () => {
-    const selectedSim = MOCK_PROFILES[activeSimProfileIdx];
-    // Check if referral param of custom register is in URL E.g. ?ref=ARIYAN88
-    const params = new URLSearchParams(window.location.search);
-    const refParam = params.get('ref') || undefined;
+    try {
+      const selectedSim = MOCK_PROFILES[activeSimProfileIdx];
+      // Check if referral param of custom register is in URL E.g. ?ref=ARIYAN88
+      const params = new URLSearchParams(window.location.search);
+      const refParam = params.get('ref') || undefined;
 
-    const profile = StoreDB.createOrUpdateTelegramUser(selectedSim, refParam);
-    setCurrentUser(profile);
-    setCurrentLang(profile.language);
+      const profile = StoreDB.createOrUpdateTelegramUser(selectedSim, refParam);
+      setCurrentUser(profile);
+      setCurrentLang(profile.language);
+    } catch (e) {
+      console.error("handleRefreshUser failed, executing clean fallback profile load:", e);
+      // Hard fallback profile
+      const fallbackProfile: UserProfile = {
+        uid: 'tg_fallback_user',
+        telegramId: '2837492837',
+        username: 'ariyan_rana',
+        firstName: 'Ariyan',
+        lastName: 'Rana',
+        photoUrl: '',
+        language: 'en',
+        isPremium: true,
+        joinedAt: Date.now() - 86400000,
+        country: 'Bangladesh',
+        balance: 100.0,
+        pendingBalance: 10.0,
+        coins: 1000,
+        rewardPoints: 100,
+        totalEarned: 110.0,
+        totalWithdrawn: 0,
+        referralEarned: 0,
+        referredBy: null,
+        referralCode: 'ARIYAN88',
+        referralCount: 0,
+        completedTasksCount: 0,
+        completedAdsCount: 0,
+        completedSurveysCount: 0,
+        xp: 100,
+        level: 1,
+        vipLevel: 1,
+        rank: 1,
+        lastCheckIn: 0,
+        checkInStreak: 0,
+        isBanned: false
+      };
+      setCurrentUser(fallbackProfile);
+      setCurrentLang('en');
+    }
   };
 
   const handleToggleSimProfile = () => {
