@@ -442,21 +442,35 @@ export const getDB = (): LocalDB => {
   if (cached) {
     try {
       const parsed = JSON.parse(cached);
-      // Ensure key arrays / maps are populated
+      const defaultDb = buildInitialDB();
+      
+      // Ensure EVERY key from LocalDB exists in our parsed object
+      const keys: (keyof LocalDB)[] = [
+        'users', 'tasks', 'submissions', 'withdrawals', 'tickets', 
+        'promoCodes', 'contests', 'notifications', 'depositRequests', 
+        'systemSettings', 'vipTiers', 'achievements'
+      ];
+      
+      for (const key of keys) {
+        if (parsed[key] === undefined || parsed[key] === null) {
+          (parsed as any)[key] = defaultDb[key];
+        }
+      }
+      
+      // Ensure specific arrays/maps are never empty if vital
+      if (!parsed.users || Object.keys(parsed.users).length === 0) parsed.users = defaultDb.users;
       if (!parsed.tasks || parsed.tasks.length === 0) parsed.tasks = DEFAULT_TASKS;
-      if (!parsed.promoCodes || parsed.promoCodes.length === 0) parsed.promoCodes = buildInitialDB().promoCodes;
+      if (!parsed.promoCodes || parsed.promoCodes.length === 0) parsed.promoCodes = defaultDb.promoCodes;
       if (!parsed.vipTiers || parsed.vipTiers.length === 0) parsed.vipTiers = DEFAULT_VIP_TIERS;
       if (!parsed.achievements || parsed.achievements.length === 0) parsed.achievements = DEFAULT_ACHIEVEMENTS;
       if (!parsed.depositRequests) parsed.depositRequests = [];
-      if (!parsed.systemSettings) parsed.systemSettings = {};
-      if (parsed.systemSettings.depositWalletAddress === undefined) {
-        parsed.systemSettings.depositWalletAddress = 'bKash/Nagad/Rocket (Personal): +8801700112233\nBinance Pay UID: 73927492';
-      }
-      if (parsed.systemSettings.minDepositAmount === undefined) {
-        parsed.systemSettings.minDepositAmount = 2.0;
-      }
+      
+      // Deep merge system settings to prevent individual flag undefined errors
+      parsed.systemSettings = { ...defaultDb.systemSettings, ...parsed.systemSettings };
+      
       return parsed;
-    } catch {
+    } catch (err) {
+      console.error("Error migrating/loading cached store:", err);
       if (memoryDB) return memoryDB;
       const defaultDb = buildInitialDB();
       saveDB(defaultDb);
