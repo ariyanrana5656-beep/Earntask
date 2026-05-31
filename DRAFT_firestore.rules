@@ -1,0 +1,271 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. Primitive Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+    
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+    
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+    
+    function incoming() {
+      return request.resource.data;
+    }
+    
+    function existing() {
+      return resource.data;
+    }
+
+    // 3. Validation Blueprints (Anti-Update-Gaps)
+    function isValidUserProfile(data) {
+      return data.uid is string && data.uid.size() <= 128 && data.uid == request.auth.uid
+        && data.telegramId is string && data.telegramId.size() <= 50
+        && data.username is string && data.username.size() <= 100
+        && data.firstName is string && data.firstName.size() <= 100
+        && data.lastName is string && data.lastName.size() <= 100
+        && data.photoUrl is string && data.photoUrl.size() <= 300
+        && data.language is string && (data.language == 'en' || data.language == 'bn' || data.language == 'ar' || data.language == 'hi')
+        && data.isPremium is bool
+        && data.joinedAt is int
+        && data.country is string && data.country.size() <= 100
+        && data.balance is number && data.balance >= 0
+        && data.pendingBalance is number && data.pendingBalance >= 0
+        && data.coins is int && data.coins >= 0
+        && data.rewardPoints is int && data.rewardPoints >= 0
+        && data.totalEarned is number && data.totalEarned >= 0
+        && data.totalWithdrawn is number && data.totalWithdrawn >= 0
+        && data.referralEarned is number && data.referralEarned >= 0
+        && (data.referredBy == null || data.referredBy is string)
+        && data.referralCode is string && data.referralCode.size() <= 50
+        && data.referralCount is int && data.referralCount >= 0
+        && data.completedTasksCount is int && data.completedTasksCount >= 0
+        && data.completedAdsCount is int && data.completedAdsCount >= 0
+        && data.completedSurveysCount is int && data.completedSurveysCount >= 0
+        && data.xp is int && data.xp >= 0
+        && data.level is int && data.level >= 1
+        && data.vipLevel is int && data.vipLevel >= 0
+        && data.rank is int && data.rank >= 0
+        && data.lastCheckIn is int
+        && data.checkInStreak is int && data.checkInStreak >= 0
+        && data.isBanned is bool;
+    }
+
+    function isValidTask(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.title is string && data.title.size() <= 200
+        && data.description is string && data.description.size() <= 1000
+        && data.type is string && data.type.size() <= 50
+        && data.reward is number && data.reward >= 0
+        && data.rewardPoints is int && data.rewardPoints >= 0
+        && data.xpReward is int && data.xpReward >= 0
+        && data.url is string && data.url.size() <= 500
+        && data.verificationType is string && (data.verificationType == 'auto' || data.verificationType == 'manual')
+        && data.cooldownHours is number && data.cooldownHours >= 0
+        && data.dailyLimit is int && data.dailyLimit >= 0
+        && data.countryFilters is list
+        && data.deviceFilters is list
+        && data.isActive is bool
+        && data.createdAt is int;
+    }
+
+    function isValidSubmission(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.taskId is string && data.taskId.size() <= 128
+        && data.userId is string && data.userId == request.auth.uid
+        && data.telegramUsername is string && data.telegramUsername.size() <= 100
+        && data.submittedAt is int
+        && (!('screenshotUrl' in data) || data.screenshotUrl is string)
+        && data.status is string && (data.status == 'pending' || data.status == 'approved' || data.status == 'rejected')
+        && (!('rejectionReason' in data) || data.rejectionReason is string);
+    }
+
+    function isValidWithdrawal(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.userId is string && data.userId == request.auth.uid
+        && data.username is string && data.username.size() <= 100
+        && data.method is string && data.method.size() <= 50
+        && data.accountDetails is string && data.accountDetails.size() <= 200
+        && data.amount is number && data.amount > 0
+        && data.status is string && (data.status == 'pending' || data.status == 'approved' || data.status == 'rejected')
+        && data.requestedAt is int;
+    }
+
+    function isValidTicket(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.userId is string && data.userId == request.auth.uid
+        && data.subject is string && data.subject.size() <= 200
+        && data.category is string && (data.category == 'wallet' || data.category == 'task' || data.category == 'bug' || data.category == 'other')
+        && data.status is string && (data.status == 'open' || data.status == 'answered' || data.status == 'closed')
+        && data.createdAt is int
+        && data.messages is list;
+    }
+
+    function isValidPromoCode(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.code is string && data.code.size() <= 50
+        && data.rewardValue is int && data.rewardValue >= 0
+        && data.usageLimit is int && data.usageLimit >= 0
+        && data.usedCount is int && data.usedCount >= 0
+        && data.expiresAt is int
+        && data.usedBy is list;
+    }
+
+    function isValidContest(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.title is string && data.title.size() <= 200
+        && data.type is string && (data.type == 'referral' || data.type == 'earnings' || data.type == 'tasks')
+        && data.startDate is int
+        && data.endDate is int
+        && data.prizePool is int && data.prizePool >= 0
+        && data.isActive is bool;
+    }
+
+    function isValidAppNotification(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.title is string && data.title.size() <= 200
+        && data.message is string && data.message.size() <= 1000
+        && data.category is string && (data.category == 'system' || data.category == 'task' || data.category == 'reward' || data.category == 'withdrawal' || data.category == 'referral')
+        && data.timestamp is int
+        && data.read is bool
+        && (!('userId' in data) || data.userId is string);
+    }
+
+    function isValidSystemSettings(data) {
+      return data.commissionL1 is int && data.commissionL1 >= 0 && data.commissionL1 <= 100
+        && data.commissionL2 is int && data.commissionL2 >= 0 && data.commissionL2 <= 100
+        && data.commissionL3 is int && data.commissionL3 >= 0 && data.commissionL3 <= 100
+        && data.maintenanceMode is bool
+        && data.telegramBotUrl is string && data.telegramBotUrl.size() <= 300
+        && data.announcement is string && data.announcement.size() <= 1000;
+    }
+
+    // 4. Matches with collections
+
+    // User Profiles
+    match /users/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+      allow create: if isOwner(userId) && isValidUserProfile(incoming());
+      
+      // Tiered update logic
+      allow update: if (
+        (isOwner(userId) && isValidUserProfile(incoming()) && (
+          // Users cannot ban themselves or edit bans
+          incoming().isBanned == existing().isBanned
+        )) || isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Admins List
+    match /admins/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Tasks Info
+    match /tasks/{taskId} {
+      allow get: if isSignedIn() && isValidId(taskId);
+      allow list: if isSignedIn();
+      allow create, update, delete: if isAdmin() && isValidTask(incoming());
+    }
+
+    // Task submissions
+    match /submissions/{submissionId} {
+      allow get: if isSignedIn() && isValidId(submissionId) && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isValidSubmission(incoming());
+      
+      // Update: Admin approval process
+      allow update: if (
+        isAdmin() && isValidSubmission(incoming())
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Withdrawals
+    match /withdrawals/{withdrawalId} {
+      allow get: if isSignedIn() && isValidId(withdrawalId) && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isValidWithdrawal(incoming()) && incoming().status == 'pending';
+      
+      // Update: Only Admin can update status
+      allow update: if (
+        isAdmin() && isValidWithdrawal(incoming())
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Support Tickets
+    match /tickets/{ticketId} {
+      allow get: if isSignedIn() && isValidId(ticketId) && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isValidTicket(incoming());
+      allow update: if (
+        // Creator can reply to open tickets or close
+        (existing().userId == request.auth.uid && isValidTicket(incoming()) && incoming().status != 'answered') ||
+        isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Promo Codes
+    match /promoCodes/{promoCodeId} {
+      allow get: if isSignedIn() && isValidId(promoCodeId);
+      allow list: if isSignedIn();
+      allow create, update, delete: if isAdmin() && isValidPromoCode(incoming());
+      
+      // Allow regular users to increment used counters
+      allow update: if (
+        isSignedIn() && isValidPromoCode(incoming()) && (
+          // Operation: Redeem Promo
+          incoming().usedCount == existing().usedCount + 1 &&
+          incoming().usedBy.size() == existing().usedBy.size() + 1 &&
+          incoming().usedBy.hasAll(existing().usedBy)
+        )
+      );
+    }
+
+    // Contests
+    match /contests/{contestId} {
+      allow get: if isSignedIn() && isValidId(contestId);
+      allow list: if isSignedIn();
+      allow create, update, delete: if isAdmin() && isValidContest(incoming());
+    }
+
+    // App Notifications
+    match /notifications/{notificationId} {
+      allow get: if isSignedIn() && isValidId(notificationId) && (!('userId' in existing()) || existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (!('userId' in resource.data) || resource.data.userId == request.auth.uid || isAdmin());
+      
+      allow create: if isSignedIn() && isValidAppNotification(incoming());
+      allow update: if (
+        (existing().userId == request.auth.uid && isValidAppNotification(incoming()) && incoming().diff(existing()).affectedKeys().hasOnly(['read'])) ||
+        isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    // System Settings Document
+    match /settings/system {
+      allow get: if isSignedIn();
+      allow create, update, delete: if isAdmin() && isValidSystemSettings(incoming());
+    }
+  }
+}

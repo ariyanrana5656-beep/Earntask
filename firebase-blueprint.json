@@ -1,0 +1,254 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Represents the user's earning profile and telegram metadata",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "telegramId": { "type": "string" },
+        "username": { "type": "string" },
+        "firstName": { "type": "string" },
+        "lastName": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "language": { "type": "string", "enum": ["en", "bn", "ar", "hi"] },
+        "isPremium": { "type": "boolean" },
+        "joinedAt": { "type": "number" },
+        "country": { "type": "string" },
+        "balance": { "type": "number" },
+        "pendingBalance": { "type": "number" },
+        "coins": { "type": "number" },
+        "rewardPoints": { "type": "number" },
+        "totalEarned": { "type": "number" },
+        "totalWithdrawn": { "type": "number" },
+        "referralEarned": { "type": "number" },
+        "referredBy": { "type": "string" },
+        "referralCode": { "type": "string" },
+        "referralCount": { "type": "number" },
+        "completedTasksCount": { "type": "number" },
+        "completedAdsCount": { "type": "number" },
+        "completedSurveysCount": { "type": "number" },
+        "xp": { "type": "number" },
+        "level": { "type": "number" },
+        "vipLevel": { "type": "number" },
+        "rank": { "type": "number" },
+        "lastCheckIn": { "type": "number" },
+        "checkInStreak": { "type": "number" },
+        "isBanned": { "type": "boolean" }
+      },
+      "required": [
+        "uid",
+        "telegramId",
+        "username",
+        "firstName",
+        "language",
+        "isPremium",
+        "joinedAt",
+        "country",
+        "balance",
+        "pendingBalance",
+        "coins",
+        "rewardPoints",
+        "totalEarned",
+        "totalWithdrawn",
+        "referralEarned",
+        "referralCode",
+        "referralCount",
+        "completedTasksCount",
+        "completedAdsCount",
+        "completedSurveysCount",
+        "xp",
+        "level",
+        "vipLevel",
+        "rank",
+        "lastCheckIn",
+        "checkInStreak",
+        "isBanned"
+      ]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "An earning task published by developers or sponsors",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "type": { "type": "string" },
+        "reward": { "type": "number" },
+        "rewardPoints": { "type": "number" },
+        "xpReward": { "type": "number" },
+        "url": { "type": "string" },
+        "verificationType": { "type": "string" },
+        "cooldownHours": { "type": "number" },
+        "dailyLimit": { "type": "number" },
+        "countryFilters": { "type": "array" },
+        "deviceFilters": { "type": "array" },
+        "isActive": { "type": "boolean" },
+        "createdAt": { "type": "number" }
+      },
+      "required": [
+        "id",
+        "title",
+        "description",
+        "type",
+        "reward",
+        "rewardPoints",
+        "xpReward",
+        "url",
+        "verificationType",
+        "cooldownHours",
+        "dailyLimit",
+        "countryFilters",
+        "deviceFilters",
+        "isActive",
+        "createdAt"
+      ]
+    },
+    "TaskSubmission": {
+      "title": "TaskSubmission",
+      "description": "Record of a user completing a task, pending admin verification or auto approval",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "taskId": { "type": "string" },
+        "userId": { "type": "string" },
+        "telegramUsername": { "type": "string" },
+        "submittedAt": { "type": "number" },
+        "screenshotUrl": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "rejectionReason": { "type": "string" }
+      },
+      "required": ["id", "taskId", "userId", "telegramUsername", "submittedAt", "status"]
+    },
+    "WithdrawalRequest": {
+      "title": "WithdrawalRequest",
+      "description": "A payment payout request submitted by a user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "username": { "type": "string" },
+        "method": { "type": "string" },
+        "accountDetails": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "requestedAt": { "type": "number" },
+        "processedAt": { "type": "number" }
+      },
+      "required": ["id", "userId", "username", "method", "accountDetails", "amount", "status", "requestedAt"]
+    },
+    "SupportTicket": {
+      "title": "SupportTicket",
+      "description": "User feedback, bug report, or help ticket",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "subject": { "type": "string" },
+        "category": { "type": "string", "enum": ["wallet", "task", "bug", "other"] },
+        "status": { "type": "string", "enum": ["open", "answered", "closed"] },
+        "createdAt": { "type": "number" },
+        "messages": { "type": "array" }
+      },
+      "required": ["id", "userId", "subject", "category", "status", "createdAt", "messages"]
+    },
+    "PromoCode": {
+      "title": "PromoCode",
+      "description": "Redeemable promo codes to earn free instant coins",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "code": { "type": "string" },
+        "rewardValue": { "type": "number" },
+        "usageLimit": { "type": "number" },
+        "usedCount": { "type": "number" },
+        "expiresAt": { "type": "number" },
+        "usedBy": { "type": "array" }
+      },
+      "required": ["id", "code", "rewardValue", "usageLimit", "usedCount", "expiresAt", "usedBy"]
+    },
+    "Contest": {
+      "title": "Contest",
+      "description": "Active or completed ranking contest with leaderboard pools",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "type": { "type": "string", "enum": ["referral", "earnings", "tasks"] },
+        "startDate": { "type": "number" },
+        "endDate": { "type": "number" },
+        "prizePool": { "type": "number" },
+        "isActive": { "type": "boolean" }
+      },
+      "required": ["id", "title", "type", "startDate", "endDate", "prizePool", "isActive"]
+    },
+    "AppNotification": {
+      "title": "AppNotification",
+      "description": "Push notification and logs for the specific user or system wide announcements",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "category": { "type": "string", "enum": ["system", "task", "reward", "withdrawal", "referral"] },
+        "timestamp": { "type": "number" },
+        "read": { "type": "boolean" },
+        "userId": { "type": "string" }
+      },
+      "required": ["id", "title", "message", "category", "timestamp", "read"]
+    },
+    "SystemSettings": {
+      "title": "SystemSettings",
+      "description": "Global administrator configuration and variables of TaskEarn Pro",
+      "type": "object",
+      "properties": {
+        "commissionL1": { "type": "number" },
+        "commissionL2": { "type": "number" },
+        "commissionL3": { "type": "number" },
+        "maintenanceMode": { "type": "boolean" },
+        "telegramBotUrl": { "type": "string" },
+        "announcement": { "type": "string" }
+      },
+      "required": ["commissionL1", "commissionL2", "commissionL3", "maintenanceMode", "telegramBotUrl", "announcement"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Collects user profiles indexed by UID"
+    },
+    "/tasks/{taskId}": {
+      "schema": { "$ref": "#/entities/Task" },
+      "description": "Provides earning tasks"
+    },
+    "/submissions/{submissionId}": {
+      "schema": { "$ref": "#/entities/TaskSubmission" },
+      "description": "Contains submissions submitted by users"
+    },
+    "/withdrawals/{withdrawalId}": {
+      "schema": { "$ref": "#/entities/WithdrawalRequest" },
+      "description": "User withdrawal requests for payouts"
+    },
+    "/tickets/{ticketId}": {
+      "schema": { "$ref": "#/entities/SupportTicket" },
+      "description": "Customer support tickets"
+    },
+    "/promoCodes/{promoCodeId}": {
+      "schema": { "$ref": "#/entities/PromoCode" },
+      "description": "Redeemable system promo codes"
+    },
+    "/contests/{contestId}": {
+      "schema": { "$ref": "#/entities/Contest" },
+      "description": "Gamified race contests"
+    },
+    "/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/AppNotification" },
+      "description": "User and system logs notifications"
+    },
+    "/settings/system": {
+      "schema": { "$ref": "#/entities/SystemSettings" },
+      "description": "System-wide admin settings document"
+    }
+  }
+}
