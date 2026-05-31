@@ -2,7 +2,5 @@
   "name": "TaskEarn Pro",
   "description": "Enterprise-grade Telegram Mini App Earning Platform featuring task auto-verification, multi-level affiliates (L1-L3), interactive SVG lucky games, with fully modular administration controls.",
   "requestFramePermissions": [],
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
+  "majorCapabilities": []
 }

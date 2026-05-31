@@ -418,8 +418,27 @@ const buildInitialDB = (): LocalDB => {
   };
 };
 
+let memoryDB: LocalDB | null = null;
+
+const safeGetItem = (key: string): string | null => {
+  try {
+    return localStorage.getItem(key);
+  } catch (e) {
+    console.warn("Storage access is restricted; falling back to in-memory store.", e);
+    return null;
+  }
+};
+
+const safeSetItem = (key: string, value: string) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch (e) {
+    console.warn("Storage access is restricted; unable to write to localStorage.", e);
+  }
+};
+
 export const getDB = (): LocalDB => {
-  const cached = localStorage.getItem(STORAGE_KEY);
+  const cached = safeGetItem(STORAGE_KEY);
   if (cached) {
     try {
       const parsed = JSON.parse(cached);
@@ -438,11 +457,13 @@ export const getDB = (): LocalDB => {
       }
       return parsed;
     } catch {
+      if (memoryDB) return memoryDB;
       const defaultDb = buildInitialDB();
       saveDB(defaultDb);
       return defaultDb;
     }
   } else {
+    if (memoryDB) return memoryDB;
     const defaultDb = buildInitialDB();
     saveDB(defaultDb);
     return defaultDb;
@@ -450,7 +471,8 @@ export const getDB = (): LocalDB => {
 };
 
 export const saveDB = (db: LocalDB) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+  memoryDB = db;
+  safeSetItem(STORAGE_KEY, JSON.stringify(db));
 };
 
 // Helper to interact with the Local DB engine
