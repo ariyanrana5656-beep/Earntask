@@ -60,7 +60,7 @@ export default function AestheticFrame({
       )}
 
       {/* Main Core View Area */}
-      <main className={`w-full max-w-md bg-slate-955 bg-opacity-95 backdrop-blur-xl sm:border flex flex-col min-h-[820px] sm:min-h-[840px] sm:max-h-[860px] relative z-10 ${
+      <main className={`w-full max-w-md bg-slate-955 bg-opacity-95 backdrop-blur-xl sm:border flex flex-col h-[100dvh] sm:h-[840px] sm:max-h-[860px] relative z-10 ${
         viewMode === 'admin' 
           ? 'sm:rounded-b-3xl border-t-0 sm:border-x sm:border-b border-slate-850' 
           : 'sm:rounded-3xl border-slate-850'
