@@ -1,6 +1,16 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { 
+  getFirestore,
+  collection as realCollection,
+  doc as realDoc,
+  getDoc as realGetDoc,
+  getDocs as realGetDocs,
+  setDoc as realSetDoc,
+  updateDoc as realUpdateDoc,
+  deleteDoc as realDeleteDoc,
+  writeBatch as realWriteBatch
+} from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 // Safe variables
@@ -42,6 +52,78 @@ export const googleProvider = isFirebaseAvailable ? googleProviderInstance : {};
 
 export const db = isFirebaseAvailable ? dbInstance : null;
 export const firestore = db; // Alias to prevent local DB variable shadowing in store.ts
+
+// Guarded / Fallback implementations of Firestore methods
+export const collection = (dbRef: any, ...args: any[]) => {
+  if (isFirebaseAvailable && dbRef) {
+    return (realCollection as any)(dbRef, ...args);
+  }
+  return { id: args[0] || 'dummy-col', path: args[0] || 'dummy-col' } as any;
+};
+
+export const doc = (dbRef: any, ...args: any[]) => {
+  if (isFirebaseAvailable && dbRef) {
+    return (realDoc as any)(dbRef, ...args);
+  }
+  return { id: args[1] || 'dummy-doc', path: args.join('/') } as any;
+};
+
+export const getDoc = async (docRef: any) => {
+  if (isFirebaseAvailable && docRef && docRef.path && !docRef.path.includes('dummy')) {
+    return realGetDoc(docRef);
+  }
+  return {
+    exists: () => false,
+    data: () => null,
+    id: docRef?.id || 'dummy-doc',
+  } as any;
+};
+
+export const getDocs = async (colRef: any) => {
+  if (isFirebaseAvailable && colRef && colRef.path && !colRef.path.includes('dummy')) {
+    return realGetDocs(colRef);
+  }
+  return {
+    empty: true,
+    size: 0,
+    docs: [],
+    forEach: () => {},
+  } as any;
+};
+
+export const setDoc = async (docRef: any, data: any, options?: any) => {
+  if (isFirebaseAvailable && docRef && docRef.path && !docRef.path.includes('dummy')) {
+    return realSetDoc(docRef, data, options);
+  }
+  return Promise.resolve();
+};
+
+export const updateDoc = async (docRef: any, data: any) => {
+  if (isFirebaseAvailable && docRef && docRef.path && !docRef.path.includes('dummy')) {
+    return realUpdateDoc(docRef, data);
+  }
+  return Promise.resolve();
+};
+
+export const deleteDoc = async (docRef: any) => {
+  if (isFirebaseAvailable && docRef && docRef.path && !docRef.path.includes('dummy')) {
+    return realDeleteDoc(docRef);
+  }
+  return Promise.resolve();
+};
+
+export const writeBatch = (dbRef: any) => {
+  if (isFirebaseAvailable && dbRef) {
+    return realWriteBatch(dbRef);
+  }
+  const dummyBatch = {
+    set: () => dummyBatch,
+    update: () => dummyBatch,
+    delete: () => dummyBatch,
+    commit: async () => Promise.resolve(),
+  };
+  return dummyBatch as any;
+};
 
 export enum OperationType {
   CREATE = 'create',

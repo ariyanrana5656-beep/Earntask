@@ -5,9 +5,9 @@ import {
   TaskType
 } from '../types';
 import { 
+  firestore, auth, handleFirestoreError, OperationType, 
   collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, writeBatch 
-} from 'firebase/firestore';
-import { firestore, auth, handleFirestoreError, OperationType } from './firebase';
+} from './firebase';
 
 // Default tasks for task center
 const DEFAULT_TASKS: Task[] = [
