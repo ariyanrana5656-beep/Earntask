@@ -23,6 +23,28 @@ export default function ProfilePage({ user, onRefreshUser, showToast }: ProfileP
   const [authError, setAuthError] = useState<string | null>(null);
   const [showSyncInfo, setShowSyncInfo] = useState(false);
 
+  // Custom Telegram profile editing states
+  const [isEditing, setIsEditing] = useState(false);
+  const [editFirstName, setEditFirstName] = useState(user.firstName);
+  const [editUsername, setEditUsername] = useState(user.username);
+  const [editTelegramId, setEditTelegramId] = useState(user.telegramId);
+  const [editPhotoUrl, setEditPhotoUrl] = useState(user.photoUrl);
+
+  const presetAvatars = [
+    { name: 'Red Bot', url: `https://api.dicebear.com/7.x/bottts/svg?seed=Rana&backgroundColor=ef4444` },
+    { name: 'Indigo Star', url: `https://api.dicebear.com/7.x/bottts/svg?seed=Ariyan&backgroundColor=6366f1` },
+    { name: 'Emerald Cash', url: `https://api.dicebear.com/7.x/bottts/svg?seed=Nadim&backgroundColor=10b981` },
+    { name: 'Teal Wealth', url: `https://api.dicebear.com/7.x/bottts/svg?seed=Crypto&backgroundColor=14b8a6` },
+    { name: 'Amber Royal', url: `https://api.dicebear.com/7.x/bottts/svg?seed=VIP&backgroundColor=f59e0b` },
+  ];
+
+  useEffect(() => {
+    setEditFirstName(user.firstName);
+    setEditUsername(user.username);
+    setEditTelegramId(user.telegramId);
+    setEditPhotoUrl(user.photoUrl);
+  }, [user]);
+
   useEffect(() => {
     setAchievements(StoreDB.getAchievementsList());
     const unsubscribe = auth.onAuthStateChanged((fUser) => {
@@ -133,34 +155,168 @@ export default function ProfilePage({ user, onRefreshUser, showToast }: ProfileP
     }
   };
 
+  const handleSaveProfile = () => {
+    if (!editFirstName.trim()) {
+      showToast("First name cannot be empty!", "error");
+      return;
+    }
+    try {
+      const cleanUsername = editUsername.trim().replace(/^@/, '');
+      StoreDB.updateUser(user.uid, {
+        firstName: editFirstName.trim(),
+        username: cleanUsername || `user_${user.telegramId}`,
+        telegramId: editTelegramId.trim() || user.telegramId,
+        photoUrl: editPhotoUrl.trim()
+      });
+      showToast("Profile details updated successfully!", "success");
+      setIsEditing(false);
+      onRefreshUser();
+    } catch (err: any) {
+      showToast(err.message, "error");
+    }
+  };
+
   return (
     <div id="profile-page-tab" className="p-4 space-y-4 text-left">
-      {/* 1. HERO BIO CARD */}
-      <div className="bg-gradient-to-r from-slate-900 to-indigo-950/40 border border-slate-800 p-4 rounded-2xl flex items-center gap-4 relative overflow-hidden">
+      {/* 1. HERO BIO CARD WITH INTEGRATED PROFILE CONFIGURATOR */}
+      <div className="bg-gradient-to-r from-slate-900 to-indigo-950/40 border border-slate-800 p-4 rounded-2xl flex flex-col gap-4 relative overflow-hidden">
         {/* Glow effect */}
         <div className="absolute top-0 right-0 w-16 h-16 bg-white/5 rounded-full filter blur-lg" />
 
-        <div className="relative">
-          <img
-            src={user.photoUrl}
-            alt={user.firstName}
-            className="w-16 h-16 rounded-full border-2 border-indigo-500 shadow-lg"
-          />
-          <span className="absolute bottom-0 right-0 w-4 h-4 bg-emerald-400 rounded-full border-2 border-slate-950 flex items-center justify-center">
-            <span className="w-1.5 h-1.5 bg-slate-950 rounded-full animate-ping" />
-          </span>
+        <div className="flex items-center justify-between w-full">
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <img
+                src={editPhotoUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.telegramId}`}
+                alt={editFirstName}
+                className="w-16 h-16 rounded-full border-2 border-indigo-500 shadow-lg object-cover"
+                onError={(e) => {
+                  (e.target as any).src = `https://api.dicebear.com/7.x/bottts/svg?seed=${user.telegramId}`;
+                }}
+              />
+              <span className="absolute bottom-0 right-0 w-4 h-4 bg-emerald-400 rounded-full border-2 border-slate-950 flex items-center justify-center">
+                <span className="w-1.5 h-1.5 bg-slate-950 rounded-full animate-ping" />
+              </span>
+            </div>
+
+            <div className="space-y-1">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <h3 className="font-extrabold text-slate-100 text-sm leading-tight">{editFirstName}</h3>
+                <span className="text-[10.5px] text-slate-400 font-mono">(@{editUsername})</span>
+                {user.isPremium && <BadgeCheck className="w-4 h-4 text-sky-400 fill-sky-500" />}
+              </div>
+              <p className="text-[10px] text-indigo-300 uppercase font-extrabold tracking-tight">TELEGRAM ID: {editTelegramId} • Level {user.level}</p>
+              <span className="text-[10px] text-slate-500 flex items-center gap-1 font-mono">
+                <Calendar className="w-3.5 h-3.5" /> Est: {new Date(user.joinedAt).toLocaleDateString()} • <Globe className="w-3.5 h-3.5" /> {user.country}
+              </span>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setIsEditing(!isEditing)}
+            className="px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-650/40 border border-indigo-500/30 text-indigo-300 text-[10.5px] uppercase font-black tracking-tight rounded-xl transition cursor-pointer"
+          >
+            {isEditing ? 'Close' : 'Edit Info'}
+          </button>
         </div>
 
-        <div className="space-y-1">
-          <div className="flex items-center gap-1.5">
-            <h3 className="font-extrabold text-slate-100 text-sm">@{user.username}</h3>
-            {user.isPremium && <BadgeCheck className="w-4 h-4 text-sky-400 fill-sky-500" />}
-          </div>
-          <p className="text-xs text-indigo-400 uppercase font-bold tracking-tight">Level {user.level} Earning Pilot</p>
-          <span className="text-[10px] text-slate-500 flex items-center gap-1 font-mono">
-            <Calendar className="w-3.5 h-3.5" /> Est: {new Date(user.joinedAt).toLocaleDateString()} • <Globe className="w-3.5 h-3.5" /> {user.country}
-          </span>
-        </div>
+        {/* Collapsible Edit Panel */}
+        <AnimatePresence>
+          {isEditing && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="border-t border-slate-800/80 pt-4 space-y-4 overflow-hidden"
+            >
+              <h4 className="text-xs font-black text-indigo-400 uppercase tracking-widest font-mono">
+                ⚙️ Customize Profile (প্রোফাইল তথ্য পরিবর্তন করুন)
+              </h4>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase font-bold text-slate-400 font-mono">Full Name (টেলিগ্রাম নাম)</label>
+                  <input
+                    type="text"
+                    value={editFirstName}
+                    onChange={(e) => setEditFirstName(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800/80 p-2.5 rounded-xl font-mono text-xs text-slate-100 focus:border-indigo-500 outline-none transition"
+                    placeholder="Enter full name"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase font-bold text-slate-400 font-mono">Username (ইউজারনেম)</label>
+                  <input
+                    type="text"
+                    value={editUsername}
+                    onChange={(e) => setEditUsername(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800/80 p-2.5 rounded-xl font-mono text-xs text-slate-100 focus:border-indigo-500 outline-none transition"
+                    placeholder="Enter Telegram Username"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase font-bold text-slate-400 font-mono">Telegram ID (আইডি)</label>
+                  <input
+                    type="text"
+                    value={editTelegramId}
+                    onChange={(e) => setEditTelegramId(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800/80 p-2.5 rounded-xl font-mono text-xs text-slate-100 focus:border-indigo-500 outline-none transition"
+                    placeholder="Enter numeric TG ID"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase font-bold text-slate-400 font-mono">Photo URL (ফটো লিংক)</label>
+                  <input
+                    type="text"
+                    value={editPhotoUrl}
+                    onChange={(e) => setEditPhotoUrl(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800/80 p-2.5 rounded-xl font-mono text-xs text-slate-100 focus:border-indigo-505 outline-none transition"
+                    placeholder="Paste direct photo link"
+                  />
+                </div>
+              </div>
+
+              {/* Ready Preset Avatars */}
+              <div className="space-y-2">
+                <span className="text-[10px] uppercase font-bold text-slate-455 font-mono block">
+                  Quick Premium Avatars (এভারটার প্রিসেট নির্বাচন করুন):
+                </span>
+                <div className="flex gap-2.5 flex-wrap pb-1">
+                  {presetAvatars.map((av) => (
+                    <button
+                      key={av.name}
+                      onClick={() => setEditPhotoUrl(av.url)}
+                      className={`p-1 rounded-xl border transition cursor-pointer ${
+                        editPhotoUrl === av.url ? 'border-indigo-500 bg-indigo-950/25' : 'border-slate-800 hover:border-slate-700 bg-slate-950'
+                      }`}
+                    >
+                      <img src={av.url} alt={av.name} className="w-8.5 h-8.5 rounded-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-2.5 pt-1.5">
+                <button
+                  onClick={handleSaveProfile}
+                  className="flex-1 py-2 bg-indigo-605 hover:bg-indigo-550 font-black text-slate-100 text-xs uppercase tracking-tight rounded-xl cursor-pointer shadow transition active:scale-98"
+                >
+                  Save Profile Details (সংরক্ষণ করুন)
+                </button>
+                <button
+                  onClick={() => setIsEditing(false)}
+                  className="px-4 py-2 bg-slate-950 hover:bg-slate-900 border border-slate-800 font-bold text-slate-400 text-xs uppercase tracking-wide rounded-xl cursor-pointer transition"
+                >
+                  Cancel
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* CLOUD SECURE BACKUP AND SYNC CENTER */}

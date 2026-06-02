@@ -813,11 +813,124 @@ export const StoreDB = {
     if (!dbState.users[uid]) throw new Error(`User ${uid} not found`);
     dbState.users[uid] = { ...dbState.users[uid], ...fields };
     saveDB(dbState);
-    if (auth.currentUser && auth.currentUser.uid === uid) {
+    // Sync to Firestore if Firebase is active
+    if (auth.currentUser) {
       setDoc(doc(firestore, 'users', uid), dbState.users[uid], { merge: true })
         .catch(err => handleFirestoreError(err, OperationType.WRITE, `users/${uid}`));
     }
     return dbState.users[uid];
+  },
+
+  applyReferralCode: async (userId: string, refCodeInput: string): Promise<boolean> => {
+    try {
+      const db = getDB();
+      const user = db.users[userId];
+      if (!user) return false;
+      
+      // If user already has a referrer, do not apply again to prevent double-rewards
+      if (user.referredBy) {
+        console.log(`[REFERRAL] User ${userId} already has a referrer: ${user.referredBy}`);
+        return false;
+      }
+
+      const inputClean = refCodeInput.trim().toLowerCase();
+      if (!inputClean) return false;
+
+      // Check if trying to refer oneself
+      if (user.referralCode.toLowerCase() === inputClean || 
+          user.username.toLowerCase() === inputClean) {
+        console.log("[REFERRAL] Cannot refer yourself!");
+        return false;
+      }
+
+      let referrerUser: UserProfile | null = null;
+
+      // 1. First, check in local db users
+      const localReferrer = Object.values(db.users).find(
+        u => u.referralCode.toLowerCase() === inputClean ||
+             u.username.toLowerCase() === inputClean
+      );
+      if (localReferrer) {
+        referrerUser = localReferrer;
+      }
+
+      // 2. Second, check in Cloud Firestore if available
+      try {
+        const usersSnap = await getDocs(collection(firestore, 'users'));
+        if (usersSnap && usersSnap.docs) {
+          const matchedDoc = usersSnap.docs.find(doc => {
+            const uData = doc.data() as UserProfile;
+            return uData.referralCode?.toLowerCase() === inputClean ||
+                   uData.username?.toLowerCase() === inputClean;
+          });
+          if (matchedDoc) {
+            referrerUser = matchedDoc.data() as UserProfile;
+            // Cache in local db list
+            db.users[referrerUser.uid] = referrerUser;
+          }
+        }
+      } catch (err) {
+        console.error("[REFERRAL] Error searching referrer in Firestore:", err);
+      }
+
+      // 3. If found, process the referral!
+      if (referrerUser && referrerUser.uid !== user.uid) {
+        // Update current user
+        user.referredBy = referrerUser.uid;
+        db.users[user.uid] = user;
+
+        // Reward referrer user
+        referrerUser.referralCount += 1;
+        referrerUser.coins += 200; // 200 Coins for invite
+        referrerUser.xp += 50;
+        db.users[referrerUser.uid] = referrerUser;
+
+        // Push Welcome Referral Notification to Invitee
+        const inviteeNoti: AppNotification = {
+          id: `n_ref_invitee_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
+          title: '🎉 Referral Applied! (রেফারেল সফল হয়েছে)',
+          message: `Joined under @${referrerUser.username || 'user'}. Welcome reward +1000 Coins added!`,
+          category: 'referral',
+          timestamp: Date.now(),
+          read: false,
+          userId: user.uid
+        };
+        db.notifications.unshift(inviteeNoti);
+
+        // Push Active Invite Reward to Referrer
+        const referrerNoti: AppNotification = {
+          id: `n_ref_referrer_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
+          title: '👥 New Referral Registered! (নতুন রেফারেল)',
+          message: `@${user.username || 'user'} joined using your code! You received +200 Coins & +50 XP!`,
+          category: 'referral',
+          timestamp: Date.now(),
+          read: false,
+          userId: referrerUser.uid
+        };
+        db.notifications.unshift(referrerNoti);
+
+        saveDB(db);
+
+        // Save both users + notifications to Firestore
+        await setDoc(doc(firestore, 'users', user.uid), user, { merge: true })
+          .catch(err => handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}`));
+        await setDoc(doc(firestore, 'users', referrerUser.uid), referrerUser, { merge: true })
+          .catch(err => handleFirestoreError(err, OperationType.WRITE, `users/${referrerUser.uid}`));
+        await setDoc(doc(firestore, 'notifications', inviteeNoti.id), inviteeNoti)
+          .catch(err => handleFirestoreError(err, OperationType.WRITE, `notifications/${inviteeNoti.id}`));
+        await setDoc(doc(firestore, 'notifications', referrerNoti.id), referrerNoti)
+          .catch(err => handleFirestoreError(err, OperationType.WRITE, `notifications/${referrerNoti.id}`));
+        
+        console.log(`[REFERRAL] Successfully applied! User @${user.username} referred by @${referrerUser.username}`);
+        return true;
+      }
+      
+      console.log("[REFERRAL] No matching referrer found.");
+      return false;
+    } catch (e) {
+      console.error("[REFERRAL] applyReferralCode crashed:", e);
+      return false;
+    }
   },
 
   getAllUsers: () => Object.values(getDB().users),

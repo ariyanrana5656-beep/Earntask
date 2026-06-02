@@ -99,12 +99,63 @@ const MOCK_PROFILES: TelegramUser[] = [
   { id: '2283049280', username: 'rahul_india', first_name: 'Rahul', last_name: 'Sharma', is_premium: false, language_code: 'hi' }
 ];
 
+function parseTelegramUserFromUrl(): TelegramUser | null {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    let rawInitData = params.get('tgWebAppData') || params.get('initData');
+    
+    if (!rawInitData && window.location.hash) {
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      rawInitData = hashParams.get('tgWebAppData') || hashParams.get('initData');
+    }
+    
+    if (rawInitData) {
+      const decodedData = decodeURIComponent(rawInitData);
+      const initParams = new URLSearchParams(decodedData);
+      const userJson = initParams.get('user');
+      if (userJson) {
+        const u = JSON.parse(userJson);
+        if (u && u.id) {
+          return {
+            id: String(u.id),
+            username: u.username || `user_${u.id}`,
+            first_name: u.first_name || 'User',
+            last_name: u.last_name || '',
+            is_premium: !!u.is_premium,
+            language_code: u.language_code || 'en',
+            photo_url: u.photo_url || ''
+          };
+        }
+      }
+    }
+    
+    const directUser = params.get('user');
+    if (directUser) {
+      const u = JSON.parse(decodeURIComponent(directUser));
+      if (u && u.id) {
+        return {
+          id: String(u.id),
+          username: u.username || `user_${u.id}`,
+          first_name: u.first_name || 'User',
+          last_name: u.last_name || '',
+          is_premium: !!u.is_premium,
+          language_code: u.language_code || 'en',
+          photo_url: u.photo_url || ''
+        };
+      }
+    }
+  } catch (err) {
+    console.warn("Failed parsing fallback telegram user from URL:", err);
+  }
+  return null;
+}
+
 export default function App() {
   const [viewMode, setViewMode] = useState<'user' | 'admin'>('user');
   const [activePage, setActivePage] = useState<string>('home');
-  const [activeSimProfileIdx, setActiveSimProfileIdx] = useState(0);
+  const [activeSimProfileIdx, setActiveSimProfileIdx] = useState(-1);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
-  const [currentLang, setCurrentLang] = useState<Language>('en');
+  const [currentLang, setCurrentLang] = useState<Language>('bn'); // Default to Bangla since it matches target users
   const [logoClickCount, setLogoClickCount] = useState(0);
   const [sysSettings, setSysSettings] = useState(() => StoreDB.getSettings());
   
@@ -127,35 +178,106 @@ export default function App() {
 
   // 1. Initial login handler with Telegram Mini App auto-detect bindings
   useEffect(() => {
+    let activeUserUid = '';
+    let startParam = '';
+
     try {
+      const params = new URLSearchParams(window.location.search);
+      // Capture start parameter from various URL schemes (telegram startapp or standard referral query parameters)
+      startParam = params.get('ref') || params.get('tgWebAppStartParam') || params.get('startapp') || '';
+
       // Collect parameters from official Telegram Mini App WebApp SDK if available
       const tg = (window as any).Telegram?.WebApp;
       if (tg) {
         if (typeof tg.ready === 'function') tg.ready();
         if (typeof tg.expand === 'function') tg.expand();
         
+        if (tg.initDataUnsafe?.start_param) {
+          startParam = tg.initDataUnsafe.start_param;
+        }
+
         const tgUser = tg.initDataUnsafe?.user;
-        if (tgUser) {
+        // Only load original Telegram parameters if simulation index is disabled/unset (-1)
+        if (tgUser && activeSimProfileIdx === -1) {
           const profile = StoreDB.createOrUpdateTelegramUser({
             id: String(tgUser.id),
             username: tgUser.username,
             first_name: tgUser.first_name || 'User',
             last_name: tgUser.last_name || '',
             is_premium: !!tgUser.is_premium,
-            language_code: tgUser.language_code || 'en',
+            language_code: tgUser.language_code || 'bn',
             photo_url: tgUser.photo_url || ''
-          });
+          }, startParam || undefined);
+          
+          activeUserUid = profile.uid;
           setCurrentUser(profile);
           setCurrentLang(profile.language);
-          return;
         }
       }
     } catch (e) {
       console.warn("Telegram WebApp SDK safely caught exception on init:", e);
     }
 
-    // Default simulation login loader
-    handleRefreshUser();
+    // Default simulation or Web Guest login loader if no official Telegram context is initialized
+    if (!activeUserUid) {
+      // If developer explicitly selected a simulated profile, load it
+      if (activeSimProfileIdx >= 0 && activeSimProfileIdx < MOCK_PROFILES.length) {
+        const selectedSim = MOCK_PROFILES[activeSimProfileIdx];
+        const profile = StoreDB.createOrUpdateTelegramUser(selectedSim, startParam || undefined);
+        activeUserUid = profile.uid;
+        setCurrentUser(profile);
+        setCurrentLang(profile.language);
+      } else {
+        // Double check URL fragment for parsed user JSON
+        const parsedUrlUser = parseTelegramUserFromUrl();
+        if (parsedUrlUser) {
+          const profile = StoreDB.createOrUpdateTelegramUser(parsedUrlUser, startParam || undefined);
+          activeUserUid = profile.uid;
+          setCurrentUser(profile);
+          setCurrentLang(profile.language);
+        } else {
+          // Normal persistent Web user (saves in localStorage, unique per browser session/device)
+          const savedUid = localStorage.getItem('taskearn_logged_uid');
+          let storedProfile = savedUid ? StoreDB.getUser(savedUid) : null;
+          
+          if (!storedProfile) {
+            const randomId = Math.floor(Math.random() * 9000000000 + 1000000000);
+            const webUser: TelegramUser = {
+              id: String(randomId),
+              username: `web_${Math.floor(Math.random() * 90000 + 10000)}`,
+              first_name: 'Web Guest',
+              last_name: 'User',
+              is_premium: false,
+              language_code: 'bn'
+            };
+            storedProfile = StoreDB.createOrUpdateTelegramUser(webUser, startParam || undefined);
+            localStorage.setItem('taskearn_logged_uid', storedProfile.uid);
+          }
+          
+          activeUserUid = storedProfile.uid;
+          setCurrentUser(storedProfile);
+          setCurrentLang(storedProfile.language);
+        }
+      }
+    }
+
+    // Asynchronously try to apply and verify the affiliate code to the active session
+    if (activeUserUid && startParam) {
+      setTimeout(() => {
+        StoreDB.applyReferralCode(activeUserUid, startParam)
+          .then((success) => {
+            if (success) {
+              try {
+                const refreshed = StoreDB.getUser(activeUserUid);
+                if (refreshed) {
+                  setCurrentUser(refreshed);
+                  triggerToast('Referral code applied successfully! (+1000 Coins welcome gift)', 'success');
+                }
+              } catch (err) {}
+            }
+          });
+      }, 1500);
+    }
   }, [activeSimProfileIdx]);
 
   // Dynamic Real Geolocation correction
@@ -185,52 +307,16 @@ export default function App() {
   }, [currentUser?.uid]);
 
   const handleRefreshUser = () => {
-    try {
-      const selectedSim = MOCK_PROFILES[activeSimProfileIdx];
-      // Check if referral param of custom register is in URL E.g. ?ref=ARIYAN88
-      const params = new URLSearchParams(window.location.search);
-      const refParam = params.get('ref') || undefined;
-
-      const profile = StoreDB.createOrUpdateTelegramUser(selectedSim, refParam);
-      setCurrentUser(profile);
-      setCurrentLang(profile.language);
-    } catch (e) {
-      console.error("handleRefreshUser failed, executing clean fallback profile load:", e);
-      // Hard fallback profile
-      const fallbackProfile: UserProfile = {
-        uid: 'tg_fallback_user',
-        telegramId: '2837492837',
-        username: 'ariyan_rana',
-        firstName: 'Ariyan',
-        lastName: 'Rana',
-        photoUrl: '',
-        language: 'en',
-        isPremium: true,
-        joinedAt: Date.now() - 86400000,
-        country: 'Bangladesh',
-        balance: 100.0,
-        pendingBalance: 10.0,
-        coins: 1000,
-        rewardPoints: 100,
-        totalEarned: 110.0,
-        totalWithdrawn: 0,
-        referralEarned: 0,
-        referredBy: null,
-        referralCode: 'ARIYAN88',
-        referralCount: 0,
-        completedTasksCount: 0,
-        completedAdsCount: 0,
-        completedSurveysCount: 0,
-        xp: 100,
-        level: 1,
-        vipLevel: 1,
-        rank: 1,
-        lastCheckIn: 0,
-        checkInStreak: 0,
-        isBanned: false
-      };
-      setCurrentUser(fallbackProfile);
-      setCurrentLang('en');
+    if (currentUser) {
+      try {
+        const refreshed = StoreDB.getUser(currentUser.uid);
+        if (refreshed) {
+          setCurrentUser(refreshed);
+          setCurrentLang(refreshed.language);
+        }
+      } catch (e) {
+        console.error("handleRefreshUser failed:", e);
+      }
     }
   };
 
