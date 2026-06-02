@@ -53,6 +53,7 @@ export interface UserProfile {
   lastGamePlayedAt?: number;
   lastAdWatchedAt?: number;
   todayAdsCount?: number;
+  adCooldowns?: { [adId: string]: number };
 }
 
 export type TaskType = 
@@ -81,6 +82,7 @@ export interface Task {
   rewardPoints: number;
   xpReward: number;
   url: string;
+  imageUrl?: string;
   verificationType: VerificationType;
   cooldownHours: number;
   dailyLimit: number;
@@ -103,6 +105,7 @@ export interface TaskSubmission {
   telegramUsername: string;
   submittedAt: number;
   screenshotUrl?: string;
+  textProof?: string;
   status: 'pending' | 'approved' | 'rejected';
   rejectionReason?: string;
 }

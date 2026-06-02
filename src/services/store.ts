@@ -183,12 +183,11 @@ const DEFAULT_CONTESTS: Contest[] = [
 
 // Ad Network offers
 export const AD_OFFERS: AdOffer[] = [
-  { id: 'ad_monetag_banner', network: 'monetag', format: 'banner', reward: 1.5, cooldownSeconds: 30, title: 'Instant Monetag Banner' },
-  { id: 'ad_monetag_rewarded', network: 'monetag', format: 'rewarded', reward: 7.5, cooldownSeconds: 60, title: 'Premium Monetag Video' },
-  { id: 'ad_adsterra_popup', network: 'adsterra', format: 'popup', reward: 3.0, cooldownSeconds: 45, title: 'Adsterra Hot Link Click' },
-  { id: 'ad_adsterra_interstitial', network: 'adsterra', format: 'interstitial', reward: 6.0, cooldownSeconds: 90, title: 'Adsterra Rich Pop Ad' },
-  { id: 'ad_gigapub_rewarded', network: 'gigapub', format: 'rewarded', reward: 8.0, cooldownSeconds: 120, title: 'GigaPub High-Paying Ad' },
-  { id: 'ad_propeller_native', network: 'propeller', format: 'banner', reward: 2.0, cooldownSeconds: 30, title: 'Propeller Native Banner' }
+  { id: 'ad_bot_monetag', network: 'monetag', format: 'rewarded', reward: 8.5, cooldownSeconds: 43200, title: '🎁 Mega Monetag Ad Earn Bot', directUrl: 'https://t.me/MonetagAdEarn1_bot' },
+  { id: 'ad_bot_clicks', network: 'gigapub', format: 'popup', reward: 10.0, cooldownSeconds: 43200, title: '🔥 High-Paying Telegram Click Ad Bot', directUrl: 'https://t.me/GigaClickAd2_bot' },
+  { id: 'ad_bot_sponsor', network: 'propeller', format: 'rewarded', reward: 6.0, cooldownSeconds: 43200, title: '👉 Official Sponsor Ads Bot', directUrl: 'https://t.me/OfficialSponsorAd7_bot' },
+  { id: 'ad_bot_survey', network: 'adsterra', format: 'interstitial', reward: 12.0, cooldownSeconds: 43200, title: '💎 Adsterra Daily Premium Claims Bot', directUrl: 'https://t.me/AdsterraClaim9_bot' },
+  { id: 'ad_bot_promoter', network: 'custom', format: 'banner', reward: 5.0, cooldownSeconds: 43200, title: '🚀 Partner Promoters Advertisement Bot', directUrl: 'https://t.me/PartnerPromoRobot' }
 ];
 
 // Survey CPA Wall
@@ -523,6 +522,8 @@ export const StoreDB = {
       gameSpinRewardMultiplier: s.gameSpinRewardMultiplier !== undefined ? s.gameSpinRewardMultiplier : 1.0,
       supportLink: s.supportLink || 'https://t.me/TaskEarnProSupport',
       dailyAdsLimit: s.dailyAdsLimit !== undefined ? s.dailyAdsLimit : 25,
+      coinsPerDollar: (s as any).coinsPerDollar !== undefined ? (s as any).coinsPerDollar : 1000,
+      telegramBotAdUrl: (s as any).telegramBotAdUrl || 'https://t.me/TaskEarnProBot',
       ...s,
       dynamicAds: (() => {
         const defaultAds = [
@@ -683,6 +684,36 @@ export const StoreDB = {
     return entry;
   },
 
+  getEstimatedCountry: (): string => {
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (tz) {
+        const lower = tz.toLowerCase();
+        if (lower.includes('dhaka') || lower.includes('barisal') || lower.includes('chittagong') || lower.includes('sylhet')) return 'Bangladesh';
+        if (lower.includes('calcutta') || lower.includes('kolkata') || lower.includes('delhi') || lower.includes('mumbai') || lower.includes('bangalore') || lower.includes('chennai') || lower.includes('india')) return 'India';
+        if (lower.includes('karachi') || lower.includes('lahore') || lower.includes('islamabad') || lower.includes('pakistan')) return 'Pakistan';
+        if (lower.includes('kathmandu')) return 'Nepal';
+        if (lower.includes('colombo')) return 'Sri Lanka';
+        if (lower.includes('riyadh') || lower.includes('jeddah') || lower.includes('saudi')) return 'Saudi Arabia';
+        if (lower.includes('dubai') || lower.includes('abudhabi') || lower.includes('emirates')) return 'United Arab Emirates';
+        if (lower.includes('london') || lower.includes('belfast') || lower.includes('dublin')) return 'United Kingdom';
+        if (lower.includes('berlin') || lower.includes('paris') || lower.includes('rome') || lower.includes('madrid')) return 'Europe';
+        if (lower.includes('america') || lower.includes('new_york') || lower.includes('chicago') || lower.includes('los_angeles')) return 'United States';
+      }
+    } catch (e) {}
+
+    // Fallback to local user language settings
+    try {
+      const lang = (navigator.language || '').toLowerCase();
+      if (lang.startsWith('bn')) return 'Bangladesh';
+      if (lang.startsWith('hi')) return 'India';
+      if (lang.startsWith('ar')) return 'United Arab Emirates';
+      if (lang.startsWith('ur')) return 'Pakistan';
+    } catch (e) {}
+
+    return 'Bangladesh';
+  },
+
   // Users
   getUser: (uid: string): UserProfile | null => {
     const db = getDB();
@@ -731,7 +762,7 @@ export const StoreDB = {
       language: (tgUser.language_code === 'bn' || tgUser.language_code === 'ar' || tgUser.language_code === 'hi') ? tgUser.language_code as Language : 'en',
       isPremium: !!tgUser.is_premium,
       joinedAt: Date.now(),
-      country: tgUser.language_code === 'bn' ? 'Bangladesh' : tgUser.language_code === 'ar' ? 'United Arab Emirates' : tgUser.language_code === 'hi' ? 'India' : 'United States',
+      country: StoreDB.getEstimatedCountry(),
       balance: 1.0, // Registration gift: $1.00 or 100 coins
       pendingBalance: 0,
       coins: 1000,
@@ -940,7 +971,8 @@ export const StoreDB = {
   // Submissions (Task Center verify actions)
   getSubmissions: () => getDB().submissions,
   getUserSubmissions: (userId: string) => getDB().submissions.filter(s => s.userId === userId),
-  submitTask: (taskId: string, userId: string, tgUsername: string, screenshotUrl?: string) => {
+  getUserReferrals: (userId: string) => Object.values(getDB().users).filter(u => u.referredBy === userId),
+  submitTask: (taskId: string, userId: string, tgUsername: string, screenshotUrl?: string, textProof?: string) => {
     const db = getDB();
     const task = db.tasks.find(t => t.id === taskId);
     if (!task) throw new Error('Task not found');
@@ -952,6 +984,7 @@ export const StoreDB = {
       telegramUsername: tgUsername,
       submittedAt: Date.now(),
       screenshotUrl,
+      textProof,
       status: task.verificationType === 'auto' ? 'approved' : 'pending'
     };
 

@@ -60,32 +60,81 @@ export default function Dashboard({ user, onRefreshUser, showToast, setActivePag
       setLiveUserCount(prev => prev + Math.floor(Math.random() * 5) - 2);
     }, 4000);
 
-    // Dynamic feed generator
+    // Dynamic feed generator with fused REAL + SHUFFLED MOCK updates
     const activityInterval = setInterval(() => {
       setLiveActivities(prev => {
-        const rdType = Math.random() > 0.4 ? 'task' : 'withdraw';
+        const allUsers = StoreDB.getAllUsers();
+        const realSubs = StoreDB.getSubmissions().filter(s => s.status === 'approved' || s.status === 'pending');
+        const realWithdrawals = StoreDB.getWithdrawals();
         
-        // Filter out usernames that are already in any of the currently displayed liveActivities
-        const currentText = prev.join(' ').toLowerCase();
-        const availableUsernames = TRUST_USERNAMES.filter(u => !currentText.includes(u.toLowerCase()));
+        // Let's decide which event card to generate (25% chance of showcasing real events if they exist)
+        const useRealDatabaseEvent = Math.random() < 0.25;
         
-        // Fallback to complete list if all are temporarily exhausted
-        const pool = availableUsernames.length > 0 ? availableUsernames : TRUST_USERNAMES;
-        const usr = pool[Math.floor(Math.random() * pool.length)];
-
         let entry = '';
-        if (rdType === 'task') {
-          const taskName = TRUST_TASKS[Math.floor(Math.random() * TRUST_TASKS.length)];
-          const reward = [100, 150, 200, 300, 500][Math.floor(Math.random() * 5)];
-          entry = `✅ User @${usr} finished task: ${taskName} (+${reward} Coins)`;
-        } else {
-          const pay = TRUST_PAYOUTS[Math.floor(Math.random() * TRUST_PAYOUTS.length)];
-          entry = `🔥 User @${usr} has successfully withdrawn ${pay.amount} via ${pay.method}!`;
+        
+        if (useRealDatabaseEvent && (realSubs.length > 0 || realWithdrawals.length > 0)) {
+          const showWithdrawal = Math.random() > 0.5 && realWithdrawals.length > 0;
+          
+          if (showWithdrawal && realWithdrawals.length > 0) {
+            // Pick a random real withdrawal
+            const w = realWithdrawals[Math.floor(Math.random() * realWithdrawals.length)];
+            const u = allUsers.find(userObj => userObj.uid === w.userId);
+            const userHandle = u?.username || 'user_active';
+            const statusSymbol = w.status === 'approved' ? '🔥' : '⏳';
+            const statusVerb = w.status === 'approved' ? 'successfully withdrawn' : 'requested payout of';
+            
+            let amountText = '';
+            if (w.method.toLowerCase().includes('bkash') || w.method.toLowerCase().includes('nagad') || w.method.toLowerCase().includes('rocket')) {
+              amountText = `৳${Math.round(w.amount * 115)}`;
+            } else {
+              amountText = `$${w.amount.toFixed(2)}`;
+            }
+            entry = `${statusSymbol} User @${userHandle} ${statusVerb} ${amountText} via ${w.method}!`;
+          } else if (realSubs.length > 0) {
+            // Pick a random real task submission
+            const sub = realSubs[Math.floor(Math.random() * realSubs.length)];
+            const u = allUsers.find(userObj => userObj.uid === sub.userId);
+            const userHandle = u?.username || 'user';
+            
+            const taskObj = StoreDB.getTasks().find(t => t.id === sub.taskId);
+            const taskTitle = taskObj?.title || 'Paid Assignment Campaign';
+            const rewardCoins = taskObj ? taskObj.reward * 10 : 150;
+            const statusSymbol = sub.status === 'approved' ? '✅' : '⏳';
+            const statusVerb = sub.status === 'approved' ? 'completed task' : 'submitted task for review';
+            
+            entry = `${statusSymbol} User @${userHandle} ${statusVerb}: ${taskTitle} (+${rewardCoins} Coins)`;
+          }
         }
-
+        
+        // If no real database item is chosen or available, fallback to beautiful mixed mock generation
+        if (!entry) {
+          const rdType = Math.random() > 0.4 ? 'task' : 'withdraw';
+          
+          // Pull a mixture of real dynamic database users and trusted mock usernames to keep names extremely dynamic!
+          const registeredUsernames = allUsers.map(u => u.username).filter(Boolean);
+          const namePool = [...registeredUsernames, ...TRUST_USERNAMES];
+          
+          // Select an active name
+          const usr = namePool[Math.floor(Math.random() * namePool.length)];
+          
+          if (rdType === 'task') {
+            const taskName = TRUST_TASKS[Math.floor(Math.random() * TRUST_TASKS.length)];
+            const reward = [100, 150, 200, 300, 500][Math.floor(Math.random() * 5)];
+            entry = `✅ User @${usr} finished task: ${taskName} (+${reward} Coins)`;
+          } else {
+            const pay = TRUST_PAYOUTS[Math.floor(Math.random() * TRUST_PAYOUTS.length)];
+            entry = `🔥 User @${usr} has successfully withdrawn ${pay.amount} via ${pay.method}!`;
+          }
+        }
+        
+        // Avoid adding duplicate entries consecutively
+        if (prev.includes(entry)) {
+          return prev;
+        }
+        
         return [entry, ...prev.slice(0, 3)];
       });
-    }, 3800);
+    }, 3500);
 
     return () => {
       clearInterval(userInterval);

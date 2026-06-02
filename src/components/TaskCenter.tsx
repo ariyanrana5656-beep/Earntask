@@ -24,6 +24,7 @@ export default function TaskCenter({ user, onRefreshUser, showToast }: TaskCente
   // Tabs: 'earn' = Complete tasks, 'promote' = Advertise/Submit campaigns
   const [mainTab, setMainTab] = useState<'earn' | 'promote'>('earn');
   const [activeTab, setActiveTab] = useState<'all' | 'telegram' | 'social' | 'apps'>('all');
+  const [statusFilter, setStatusFilter] = useState<'available' | 'pending' | 'completed'>('available');
   const [loadingCode, setLoadingCode] = useState(false);
   const [submittingCampaign, setSubmittingCampaign] = useState(false);
 
@@ -87,7 +88,7 @@ export default function TaskCenter({ user, onRefreshUser, showToast }: TaskCente
 
   const handleSubmitVerification = (task: Task) => {
     if (task.verificationType === 'manual' && !submissionScreenshot.trim()) {
-      showToast('Please insert a valid screenshot URL or verification text.', 'error');
+      showToast('Please enter the requested verification proof details first.', 'error');
       return;
     }
 
@@ -98,13 +99,14 @@ export default function TaskCenter({ user, onRefreshUser, showToast }: TaskCente
           task.id, 
           user.uid, 
           user.username, 
-          task.verificationType === 'manual' ? submissionScreenshot : undefined
+          undefined, // we store the text proof instead of forcing a screenshot pattern
+          submissionScreenshot.trim()
         );
         
         if (task.verificationType === 'auto') {
           showToast(`Task verified! +${task.rewardPoints} Coins earned immediately!`, 'success');
         } else {
-          showToast('Proof uploaded. Admin will verify screenshots shortly.', 'success');
+          showToast('Verification proof submitted! The campaign administrator will review your submission shortly.', 'success');
         }
 
         setSelectedTask(null);
@@ -181,11 +183,44 @@ export default function TaskCenter({ user, onRefreshUser, showToast }: TaskCente
   };
 
   const filteredTasks = tasks.filter(task => {
-    if (activeTab === 'telegram') return task.type.includes('telegram');
-    if (activeTab === 'social') return task.type.includes('youtube') || task.type.includes('facebook') || task.type.includes('instagram');
-    if (activeTab === 'apps') return task.type.includes('app_install');
-    return true; // all
+    // 1. Filter by category
+    if (activeTab === 'telegram' && !task.type.includes('telegram')) return false;
+    if (activeTab === 'social' && !task.type.includes('youtube') && !task.type.includes('facebook') && !task.type.includes('instagram') && !task.type.includes('tiktok') && !task.type.includes('twitter')) return false;
+    if (activeTab === 'apps' && !task.type.includes('app_install')) return false;
+
+    // 2. Filter by status
+    const status = getStatus(task.id);
+    if (statusFilter === 'available') {
+      return status === 'idle' || status === 'rejected';
+    } else if (statusFilter === 'pending') {
+      return status === 'pending';
+    } else if (statusFilter === 'completed') {
+      return status === 'approved';
+    }
+    return true;
   });
+
+  // Calculate status counts for UI indicators
+  const getCountsForStatus = (statusVal: 'available' | 'pending' | 'completed') => {
+    return tasks.filter(task => {
+      if (activeTab === 'telegram' && !task.type.includes('telegram')) return false;
+      if (activeTab === 'social' && !task.type.includes('youtube') && !task.type.includes('facebook') && !task.type.includes('instagram') && !task.type.includes('tiktok') && !task.type.includes('twitter')) return false;
+      if (activeTab === 'apps' && !task.type.includes('app_install')) return false;
+
+      const status = getStatus(task.id);
+      if (statusVal === 'available') {
+        return status === 'idle' || status === 'rejected';
+      } else if (statusVal === 'pending') {
+        return status === 'pending';
+      } else {
+        return status === 'approved';
+      }
+    }).length;
+  };
+
+  const availableCount = getCountsForStatus('available');
+  const pendingCount = getCountsForStatus('pending');
+  const completedCount = getCountsForStatus('completed');
 
   // Calculate promotional charges
   const campaignCostCoins = newCamTarget * newCamCostOffer;
@@ -253,6 +288,80 @@ export default function TaskCenter({ user, onRefreshUser, showToast }: TaskCente
             ))}
           </div>
 
+          {/* Status filter selection tabs */}
+          <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-950/80 border border-slate-850 rounded-xl">
+            <button
+              onClick={() => setStatusFilter('available')}
+              className={`py-2 text-[10px] uppercase font-bold rounded-lg transition tracking-wide cursor-pointer flex flex-col items-center justify-center relative select-none ${
+                statusFilter === 'available'
+                  ? 'bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800 text-indigo-400 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-405 border border-transparent'
+              }`}
+            >
+              <span className="flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-indigo-400" /> Available
+              </span>
+              <span className="text-[9px] font-bold text-slate-400 mt-1 font-mono bg-slate-900/60 px-1.5 py-0.5 rounded-full border border-slate-850">
+                {availableCount}
+              </span>
+            </button>
+            <button
+              onClick={() => setStatusFilter('pending')}
+              className={`py-2 text-[10px] uppercase font-bold rounded-lg transition tracking-wide cursor-pointer flex flex-col items-center justify-center relative select-none ${
+                statusFilter === 'pending'
+                  ? 'bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-805 text-amber-500 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-405 border border-transparent'
+              }`}
+            >
+              <span className="flex items-center gap-1">
+                <Clock className="w-3 h-3 text-amber-500 animate-pulse" /> Pending
+              </span>
+              <span className="text-[9px] font-bold text-slate-400 mt-1 font-mono bg-slate-900/60 px-1.5 py-0.5 rounded-full border border-slate-850">
+                {pendingCount}
+              </span>
+            </button>
+            <button
+              onClick={() => setStatusFilter('completed')}
+              className={`py-2 text-[10px] uppercase font-bold rounded-lg transition tracking-wide cursor-pointer flex flex-col items-center justify-center relative select-none ${
+                statusFilter === 'completed'
+                  ? 'bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-805 text-emerald-400 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-405 border border-transparent'
+              }`}
+            >
+              <span className="flex items-center gap-1">
+                <CheckCircle className="w-3 h-3 text-emerald-400" /> Completed
+              </span>
+              <span className="text-[9px] font-bold text-slate-400 mt-1 font-mono bg-slate-900/60 px-1.5 py-0.5 rounded-full border border-slate-850">
+                {completedCount}
+              </span>
+            </button>
+          </div>
+
+          {/* Status Label */}
+          <div className="flex items-center justify-between px-1 bg-slate-900/20 py-1 rounded-lg border border-slate-850/30">
+            <span className="text-[9.5px] uppercase font-bold font-mono tracking-wider text-slate-350 flex items-center gap-1.5">
+              {statusFilter === 'available' ? (
+                <>
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
+                  Available Earning Tasks (চলতি কাজসমূহ)
+                </>
+              ) : statusFilter === 'pending' ? (
+                <>
+                  <Clock className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
+                  Tasks Under Review (রিভিউ করা হচ্ছে)
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="w-3.5 h-3.5 text-emerald-450" />
+                  Completed Tasks (কমপ্লিট হওয়া কাজ)
+                </>
+              )}
+            </span>
+            <span className="text-[9px] font-mono text-slate-500">
+              Total: {filteredTasks.length} {filteredTasks.length === 1 ? 'task' : 'tasks'}
+            </span>
+          </div>
+
           {/* Task List Grid */}
           <div className="space-y-2.5">
             {filteredTasks.length === 0 ? (
@@ -269,8 +378,17 @@ export default function TaskCenter({ user, onRefreshUser, showToast }: TaskCente
                     className="bg-slate-900/85 hover:bg-slate-900 border border-slate-800 hover:border-slate-750 rounded-2xl p-3.5 flex items-center justify-between transition-all"
                   >
                     <div className="flex items-center gap-3.5 flex-1 min-w-0 pr-2">
-                      <div className="p-2 bg-slate-950 rounded-xl border border-slate-800 flex-shrink-0">
-                        {getTaskIcon(task.type)}
+                      <div className="p-2 bg-slate-950 rounded-xl border border-slate-800 flex-shrink-0 w-9 h-9 flex items-center justify-center overflow-hidden">
+                        {task.imageUrl ? (
+                          <img 
+                            src={task.imageUrl}
+                            referrerPolicy="no-referrer"
+                            alt="Campaign Icon" 
+                            className="w-full h-full object-cover rounded" 
+                          />
+                        ) : (
+                          getTaskIcon(task.type)
+                        )}
                       </div>
                       <div className="min-w-0 text-left">
                         <div className="flex items-center gap-1.5 flex-wrap">
@@ -525,8 +643,17 @@ export default function TaskCenter({ user, onRefreshUser, showToast }: TaskCente
               {/* Header inside modal */}
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-2">
-                  <div className="p-2 bg-slate-950 rounded-lg border border-slate-800">
-                    {getTaskIcon(selectedTask.type)}
+                  <div className="p-2 bg-slate-950 rounded-lg border border-slate-800 w-10 h-10 flex items-center justify-center overflow-hidden flex-shrink-0">
+                    {selectedTask.imageUrl ? (
+                      <img 
+                        src={selectedTask.imageUrl} 
+                        referrerPolicy="no-referrer"
+                        alt="Task Icon" 
+                        className="w-full h-full object-cover rounded" 
+                      />
+                    ) : (
+                      getTaskIcon(selectedTask.type)
+                    )}
                   </div>
                   <div className="text-left">
                     <h3 className="font-bold text-slate-100 text-sm leading-tight">{selectedTask.title}</h3>
@@ -557,20 +684,23 @@ export default function TaskCenter({ user, onRefreshUser, showToast }: TaskCente
 
               {/* Screenshot entry form if MANUAL verification is needed */}
               {selectedTask.verificationType === 'manual' && (
-                <div className="space-y-1.5 mb-4 text-left">
-                  <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
-                    <Image className="w-3.5 h-3.5 text-indigo-400" /> Screenshot URL or Proof Code
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="E.g., https://postimg.cc/image-proof.jpg"
-                    value={submissionScreenshot}
-                    onChange={e => setSubmissionScreenshot(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
-                  />
-                  <p className="text-[9.5px] text-slate-500">
-                    *Upload verification format image to ImgBB/PostImages. Copy the link address.
+                <div className="space-y-2.5 mb-4 text-left">
+                  <p className="text-[11.5px] text-amber-450 leading-relaxed bg-amber-500/5 border border-amber-500/10 p-3 rounded-2xl">
+                    Provide verification proof details (such as username, profile link, or URL) to submit this campaign task for administrator manual review.
                   </p>
+                  
+                  <div className="space-y-1">
+                    <label className="text-[10.5px] uppercase font-black tracking-wider text-slate-400 font-mono pl-0.5 block">
+                      Verification input data
+                    </label>
+                    <textarea
+                      rows={3}
+                      placeholder="Username, email, or link proof details"
+                      value={submissionScreenshot}
+                      onChange={e => setSubmissionScreenshot(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 font-mono"
+                    />
+                  </div>
                 </div>
               )}
 
@@ -592,7 +722,7 @@ export default function TaskCenter({ user, onRefreshUser, showToast }: TaskCente
                   ) : selectedTask.verificationType === 'auto' ? (
                     'Verify Automatically'
                   ) : (
-                    'Submit Screenshot'
+                    'Submit Verification Proof'
                   )}
                 </button>
               </div>

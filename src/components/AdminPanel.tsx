@@ -54,6 +54,8 @@ export default function AdminPanel({
   const [newTaskReward, setNewTaskReward] = useState('15');
   const [newTaskPoints, setNewTaskPoints] = useState('150');
   const [newTaskVerifyType, setNewTaskVerifyType] = useState<Task['verificationType']>('manual');
+  const [newTaskDescription, setNewTaskDescription] = useState('');
+  const [newTaskImageUrl, setNewTaskImageUrl] = useState('');
 
   const [newPromoCode, setNewPromoCode] = useState('');
   const [newPromoReward, setNewPromoReward] = useState('500');
@@ -601,12 +603,13 @@ export default function AdminPanel({
     try {
       StoreDB.createTask({
         title: newTaskTitle,
-        description: `Sponsored Promotional Task. Open, join or subscribe to unlock cash credit rewards.`,
+        description: newTaskDescription.trim() || `Sponsored Promotional Task. Open, join or subscribe to unlock cash credit rewards.`,
         type: newTaskType,
         reward: parseFloat(newTaskReward) / 100, // USD cent format
         rewardPoints: parseInt(newTaskPoints),
         xpReward: Math.ceil(parseInt(newTaskPoints) / 5),
         url: newTaskUrl,
+        imageUrl: newTaskImageUrl.trim() || undefined,
         verificationType: newTaskVerifyType,
         cooldownHours: 24,
         dailyLimit: 1,
@@ -618,6 +621,8 @@ export default function AdminPanel({
       showToast('🚀 New sponsored advertising campaign launched successfully!', 'success');
       setNewTaskTitle('');
       setNewTaskUrl('');
+      setNewTaskDescription('');
+      setNewTaskImageUrl('');
       loadAdminCollections();
     } catch (err: any) {
       showToast(err.message, 'error');
@@ -1323,6 +1328,15 @@ export default function AdminPanel({
                                 </div>
                               )}
 
+                              {sub.textProof && (
+                                <div className="space-y-1 mt-1">
+                                  <span className="text-[8.5px] uppercase font-bold text-indigo-400 block font-mono">Verification Proof Data:</span>
+                                  <div className="bg-slate-950 border border-slate-850 p-2.5 rounded-xl text-xs text-slate-200 font-mono whitespace-pre-wrap break-all select-all">
+                                    {sub.textProof}
+                                  </div>
+                                </div>
+                              )}
+
                               {sub.rejectionReason && (
                                 <p className="text-[10px] text-rose-450 leading-relaxed font-mono p-1 bg-rose-950/10 rounded">
                                   <b>Ban Reason:</b> {sub.rejectionReason}
@@ -1472,6 +1486,29 @@ export default function AdminPanel({
                           value={newTaskUrl}
                           onChange={e => setNewTaskUrl(e.target.value)}
                           placeholder="https://t.me/exampleBot"
+                          className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 font-sans">
+                      <div className="space-y-1">
+                        <label className="text-[9.5px] uppercase font-bold text-slate-500">Custom Task Description (টাস্ক এর বিবরণ)</label>
+                        <textarea
+                          rows={2}
+                          value={newTaskDescription}
+                          onChange={e => setNewTaskDescription(e.target.value)}
+                          placeholder="যেমনঃ বোটে জয়েন করে ৫টি এড দেখুন এবং ইউজারনেম জমা দিন..."
+                          className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none resize-none leading-relaxed"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[9.5px] uppercase font-bold text-slate-500">Custom Task Image URL (অপশনাল টাস্কের ছবি/আইকন লিংক)</label>
+                        <input
+                          type="text"
+                          value={newTaskImageUrl}
+                          onChange={e => setNewTaskImageUrl(e.target.value)}
+                          placeholder="https://example.com/logo.png"
                           className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none"
                         />
                       </div>
@@ -2210,6 +2247,37 @@ export default function AdminPanel({
                         />
                       </div>
 
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-2">
+                        <div className="space-y-1">
+                          <label className="text-[11px] text-emerald-450 block font-black uppercase font-mono tracking-wider">
+                            Coin-to-USD Exchange rate (কয়েন এক্সচেঞ্জ রেট)
+                          </label>
+                          <input
+                            type="number"
+                            min="100"
+                            max="50000"
+                            value={(systemSettings as any).coinsPerDollar ?? 1000}
+                            onChange={e => handleToggleSettingsOption('coinsPerDollar', parseInt(e.target.value) || 1000)}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white font-mono focus:outline-none"
+                          />
+                          <p className="text-[9.5px] text-slate-500 leading-normal font-mono">Coins required per $1.00 USD (E.g., 1000)</p>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[11px] text-sky-400 block font-black uppercase font-mono tracking-wider">
+                            Telegram Ads Bot Link (বিজ্ঞাপন টেলিগ্রাম বোট লিংক)
+                          </label>
+                          <input
+                            type="text"
+                            value={(systemSettings as any).telegramBotAdUrl ?? ''}
+                            onChange={e => handleToggleSettingsOption('telegramBotAdUrl', e.target.value.trim())}
+                            placeholder="https://t.me/your_sponsor_ads_bot"
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white font-mono focus:outline-none"
+                          />
+                          <p className="text-[9.5px] text-slate-500 leading-normal font-mono">Default ad bot URL if individual ad campaign has no direct URL link</p>
+                        </div>
+                      </div>
+
                       <div className="space-y-1 pt-1">
                         <label className="text-[11px] text-slate-400 block font-bold">Admin Support Box Link (সাপোর্ট নেওয়ার জন্য কাস্টম লিংক)</label>
                         <input
@@ -2376,164 +2444,143 @@ export default function AdminPanel({
                                     </div>
                                   </div>
 
-                                  {ad.sdkScript ? (
-                                    <div className="mt-2 text-[9px] font-mono text-slate-500 bg-slate-950 p-1.5 rounded border border-slate-850 line-clamp-2 overflow-hidden h-9">
-                                      {ad.sdkScript}
-                                    </div>
-                                  ) : ad.directUrl ? (
-                                    <div className="mt-2 text-[9px] font-mono text-slate-500 bg-slate-950 p-1.5 rounded border border-slate-850 truncate leading-relaxed">
+                                  {ad.directUrl && (
+                                    <div className="mt-2 text-[9px] font-mono text-slate-450 bg-slate-950 p-1.5 rounded border border-slate-850 truncate leading-relaxed">
                                       🔗 {ad.directUrl}
                                     </div>
-                                  ) : (
-                                    <p className="mt-2 text-[9px] italic text-rose-500">No script or link active. Interactive view only.</p>
                                   )}
                                 </div>
 
-                                <div className="flex items-center gap-2 pt-2 border-t border-slate-850/40 justify-end">
-                                  <button
-                                    onClick={() => handleStartEditAd(ad)}
-                                    className="p-1 px-3 bg-slate-950 hover:bg-slate-850 text-slate-400 border border-slate-800 text-[10px] rounded-lg transition"
-                                  >
-                                    Edit
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteAd(ad.id)}
-                                    className="p-1 px-3 bg-rose-950/20 hover:bg-rose-900/20 text-rose-450 text-[10px] rounded-lg border border-rose-900/20 transition"
-                                  >
-                                    Delete
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
+                                 <div className="flex items-center gap-2 pt-2 border-t border-slate-850/40 justify-end">
+                                   <button
+                                     onClick={() => handleStartEditAd(ad)}
+                                     type="button"
+                                     className="p-1 px-3 bg-slate-950 hover:bg-slate-850 text-slate-400 border border-slate-800 text-[10px] rounded-lg transition"
+                                   >
+                                     Edit
+                                   </button>
+                                   <button
+                                     onClick={() => handleDeleteAd(ad.id)}
+                                     type="button"
+                                     className="p-1 px-3 bg-rose-950/20 hover:bg-rose-900/20 text-rose-450 text-[10px] rounded-lg border border-rose-900/20 transition"
+                                   >
+                                     Delete
+                                   </button>
+                                 </div>
+                               </div>
+                             );
+                           })}
+                         </div>
+                       )}
+                     </div>
 
-                    {/* Builder Form Box */}
-                    <form onSubmit={handleSaveDynamicAd} className="p-4 bg-slate-900/40 border border-slate-850 rounded-2xl space-y-4 text-left">
-                      <span className="text-[9.5px] uppercase font-bold font-mono text-slate-400 tracking-wider flex items-center gap-1.5">
-                        <Plus className="w-3.5 h-3.5 text-indigo-400" />
-                        {editingAdId ? `📝 Edit Ad Configuration: ID [${editingAdId.slice(0, 8)}]` : '✨ Add New Dynamic Ad Script / CPM Link'}
-                      </span>
+                     {/* Builder Form Box */}
+                     <form onSubmit={handleSaveDynamicAd} className="p-4 bg-slate-900/40 border border-slate-850 rounded-2xl space-y-4 text-left">
+                       <span className="text-[9.5px] uppercase font-bold font-mono text-slate-400 tracking-wider flex items-center gap-1.5">
+                         <Plus className="w-3.5 h-3.5 text-indigo-400" />
+                         {editingAdId ? `📝 Edit Ad Configuration: ID [${editingAdId.slice(0, 8)}]` : '✨ Add New Telegram Ad Bot Campaign (বিজ্ঞাপন ক্যাম্পেইন সংযুক্ত করুন)'}
+                       </span>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-[9.5px] uppercase font-black text-slate-450 block mb-1">Ad Inventory Title (বিজ্ঞাপন শিরোনাম)</label>
-                          <input
-                            type="text"
-                            value={adFormTitle}
-                            onChange={e => setAdFormTitle(e.target.value)}
-                            placeholder="E.g., Monetag Social Bar Top, Premium Adsterra"
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:border-indigo-505 focus:outline-none"
-                          />
-                        </div>
+                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                         <div>
+                           <label className="text-[9.5px] uppercase font-black text-slate-450 block mb-1">Ad Campaign Title (বিজ্ঞাপনের নাম)</label>
+                           <input
+                             type="text"
+                             value={adFormTitle}
+                             onChange={e => setAdFormTitle(e.target.value)}
+                             placeholder="E.g., Claim Bonus Reward Bot, Starry Promo"
+                             className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:border-indigo-505 focus:outline-none"
+                           />
+                         </div>
 
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <label className="text-[9.5px] uppercase font-black text-slate-450 block mb-1">Ad Network (বিজ্ঞাপন নেটওয়ার্ক)</label>
-                            <select
-                              value={adFormNetwork}
-                              onChange={e => setAdFormNetwork(e.target.value)}
-                              className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none"
-                            >
-                              <option value="monetag">Monetag</option>
-                              <option value="adsterra">Adsterra</option>
-                              <option value="propeller">PropellerAds</option>
-                              <option value="gigapub">GigaPub</option>
-                              <option value="custom">Custom Partner</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className="text-[9.5px] uppercase font-black text-slate-450 block mb-1">Format (বিজ্ঞাপন ফরম্যাট)</label>
-                            <select
-                              value={adFormFormat}
-                              onChange={e => setAdFormFormat(e.target.value)}
-                              className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none"
-                            >
-                              <option value="banner">Banner / SmartTag</option>
-                              <option value="popup">Popunder / Click</option>
-                              <option value="rewarded">Rewarded Video</option>
-                              <option value="interstitial">Interstitial Page</option>
-                            </select>
-                          </div>
-                        </div>
-                      </div>
+                         <div className="grid grid-cols-2 gap-2">
+                           <div>
+                             <label className="text-[9.5px] uppercase font-black text-slate-450 block mb-1">Ad Network (বিজ্ঞাপন নেটওয়ার্ক)</label>
+                             <select
+                               value={adFormNetwork}
+                               onChange={e => setAdFormNetwork(e.target.value)}
+                               className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none"
+                             >
+                               <option value="monetag">Monetag</option>
+                               <option value="adsterra">Adsterra</option>
+                               <option value="propeller">PropellerAds</option>
+                               <option value="gigapub">GigaPub</option>
+                               <option value="telegram_bot">Telegram Bot</option>
+                               <option value="custom">Custom Partner</option>
+                             </select>
+                           </div>
+                           <div>
+                             <label className="text-[9.5px] uppercase font-black text-slate-450 block mb-1">Format (বিজ্ঞাপন ফরম্যাট)</label>
+                             <select
+                               value={adFormFormat}
+                               onChange={e => setAdFormFormat(e.target.value)}
+                               className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none"
+                             >
+                               <option value="banner">Banner / SmartTag</option>
+                               <option value="popup">Popunder / Click</option>
+                               <option value="rewarded">Rewarded Video</option>
+                               <option value="interstitial">Interstitial Page</option>
+                             </select>
+                           </div>
+                         </div>
+                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-[9.5px] uppercase font-black text-slate-450 block mb-1">Reward Value Factor (পুরস্কার গুণক: 1.5 = 15 coins)</label>
-                          <input
-                            type="number"
-                            step="0.1"
-                            value={adFormReward}
-                            onChange={e => setAdFormReward(e.target.value)}
-                            placeholder="Defaults to 1.5"
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 font-mono focus:border-indigo-505 focus:outline-none"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[9.5px] uppercase font-black text-slate-450 block mb-1">Cooldown seconds (কুলডাউন সেকেন্ডস)</label>
-                          <input
-                            type="number"
-                            value={adFormCooldown}
-                            onChange={e => setAdFormCooldown(e.target.value)}
-                            placeholder="Defaults to 30"
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 font-mono focus:border-indigo-505 focus:outline-none"
-                          />
-                        </div>
-                      </div>
+                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                         <div>
+                           <label className="text-[9.5px] uppercase font-black text-slate-450 block mb-1">Reward Coins (যেমন: 1.5 multiplier = 15 coins)</label>
+                           <input
+                             type="number"
+                             step="0.1"
+                             value={adFormReward}
+                             onChange={e => setAdFormReward(e.target.value)}
+                             placeholder="Defaults to 1.5"
+                             className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 font-mono focus:border-indigo-505 focus:outline-none"
+                           />
+                         </div>
+                         <div>
+                           <label className="text-[9.5px] uppercase font-black text-slate-450 block mb-1">Cooldown seconds (কুলডাউন সেকেন্ডস)</label>
+                           <input
+                             type="number"
+                             value={adFormCooldown}
+                             onChange={e => setAdFormCooldown(e.target.value)}
+                             placeholder="Defaults to 30"
+                             className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 font-mono focus:border-indigo-505 focus:outline-none"
+                           />
+                         </div>
+                       </div>
 
-                      <div>
-                        <label className="text-[9.5px] uppercase font-black text-slate-450 block mb-1">Direct Ad Link / Click URL (অপশনাল সরাসরি লিঙ্ক)</label>
-                        <input
-                          type="text"
-                          value={adFormDirectUrl}
-                          onChange={e => setAdFormDirectUrl(e.target.value)}
-                          placeholder="E.g., https://delivery.monetag.com/direct/link?id=XXXXX or Adsterra Direct Link"
-                          className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 font-mono focus:border-indigo-505 focus:outline-none"
-                        />
-                      </div>
+                       <div>
+                         <label className="text-[9.5px] uppercase font-black text-slate-450 block mb-1">Telegram Ads Bot Link (বিজ্ঞাপন টেলিগ্রাম বোট লিংক) [Required]</label>
+                         <input
+                           type="text"
+                           value={adFormDirectUrl}
+                           onChange={e => setAdFormDirectUrl(e.target.value)}
+                           placeholder="E.g., https://t.me/TaskEarnProBot or Sponsor channel bot hyperlink"
+                           className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 font-mono focus:border-indigo-505 focus:outline-none"
+                         />
+                       </div>
 
-                      <div>
-                        <div className="flex justify-between items-center mb-1">
-                          <label className="text-[9.5px] uppercase font-black text-indigo-400 block font-mono">
-                            HTML SDK script Embed Code or Responsive Widget HTML (বিজ্ঞাপন স্ক্রিপ্ট কোড)
-                          </label>
-                          <span className="text-[8.5px] text-slate-500 uppercase font-mono">Will load natively to top window</span>
-                        </div>
-                        <textarea
-                          rows={3}
-                          value={adFormSdkScript}
-                          onChange={e => setAdFormSdkScript(e.target.value)}
-                          placeholder="E.g., <script src='https://libtl.com/sdk.js' data-zone='11082183' data-sdk='show_11082183'></script>"
-                          className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-[10.5px] text-slate-250 font-mono focus:border-indigo-505 focus:outline-none"
-                        />
-                        <span className="text-[9px] text-slate-500 block leading-tight mt-0.5">
-                          You can paste multiple lines here. Example: Monetag Banners, Adsterra SocialBar, or script-based smart widgets. High efficiency native runtime!
-                        </span>
-                      </div>
+                       <div className="flex items-center gap-2.5 pt-2">
+                         <button
+                           type="submit"
+                           className="flex-1 py-2 px-4 bg-gradient-to-r from-indigo-650 to-purple-650 hover:from-indigo-600 hover:to-purple-600 text-xs font-black text-white rounded-xl transition shadow flex items-center justify-center gap-1.5 cursor-pointer"
+                         >
+                           <Save className="w-4 h-4" />
+                           {editingAdId ? 'UPDATE AD OFFER CONFIG' : 'DEPLOY ACTIVE AD TO CENTER'}
+                         </button>
+                         {editingAdId && (
+                           <button
+                             type="button"
+                             onClick={handleClearAdForm}
+                             className="py-2 px-4 bg-slate-950 hover:bg-slate-900 text-slate-400 text-xs font-bold rounded-xl border border-slate-800 transition"
+                           >
+                             Cancel
+                           </button>
+                         )}
+                       </div>
+                     </form>
+                   </div>
 
-                      <div className="flex items-center gap-2.5 pt-2">
-                        <button
-                          type="submit"
-                          className="flex-1 py-2 px-4 bg-gradient-to-r from-indigo-650 to-purple-650 hover:from-indigo-600 hover:to-purple-600 text-xs font-black text-white rounded-xl transition shadow flex items-center justify-center gap-1.5 cursor-pointer"
-                        >
-                          <Save className="w-4 h-4" />
-                          {editingAdId ? 'UPDATE AD OFFER CONFIG' : 'DEPLOY ACTIVE AD TO CENTER'}
-                        </button>
-                        {editingAdId && (
-                          <button
-                            type="button"
-                            onClick={handleClearAdForm}
-                            className="py-2 px-4 bg-slate-950 hover:bg-slate-900 text-slate-400 text-xs font-bold rounded-xl border border-slate-800 transition"
-                          >
-                            Cancel
-                          </button>
-                        )}
-                      </div>
-                    </form>
-                  </div>
 
                   {/* PRODUCTION-READY AD NETWORKS CORE (MONETAG & GIGAPUB CORES) */}
                   <div className="bg-slate-950 border border-slate-850 p-5 rounded-3xl space-y-5 shadow animate-fade">

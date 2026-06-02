@@ -81,9 +81,11 @@ export default function WalletWithdraw({ user, onRefreshUser, showToast }: Walle
     }, 1200);
   };
 
-  // Convert Coin to Cash system (1000 coins = $1.00)
+  // Convert Coin to Cash system (Default 1000 coins = $1.00 or custom admin rate)
   const handleExchangeCoins = () => {
     const numCoins = parseInt(coinInput);
+    const coinsPerDollar = Number((settings as any).coinsPerDollar) || 1000;
+
     if (!numCoins || numCoins < 500) {
       showToast('Minimum exchange amount is 500 Coins.', 'error');
       return;
@@ -96,7 +98,7 @@ export default function WalletWithdraw({ user, onRefreshUser, showToast }: Walle
     setExchanging(true);
     setTimeout(() => {
       try {
-        const cashValue = (numCoins / 1000); // 1000 Coins = $1.00 USD
+        const cashValue = (numCoins / coinsPerDollar);
         const updatedUser = {
           coins: user.coins - numCoins,
           balance: user.balance + cashValue,
@@ -203,22 +205,34 @@ export default function WalletWithdraw({ user, onRefreshUser, showToast }: Walle
           <RefreshCw className="w-4 h-4 text-indigo-400" /> Coin Exchange Vault
         </h3>
         <p className="text-[10.5px] text-slate-400 mb-3 leading-relaxed">
-          Convert your collected coins into withdrawable USD cash! Rate: <b>1,000 Coins = $1.00 USD</b>. Minimum: 500 Coins.
+          Convert your collected coins into withdrawable USD cash! Rate: <b>{Number((settings as any).coinsPerDollar) || 1000} Coins = $1.00 USD</b>. Minimum: 500 Coins.
         </p>
 
         <div className="flex gap-2">
-          <input
-            type="number"
-            placeholder="Min: 500 Coins"
-            value={coinInput}
-            onChange={e => setCoinInput(e.target.value)}
-            disabled={exchanging}
-            className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white uppercase focus:outline-none focus:border-indigo-500"
-          />
+          <div className="flex-1">
+            <input
+              type="number"
+              placeholder="Min: 500 Coins"
+              value={coinInput}
+              onChange={e => setCoinInput(e.target.value)}
+              disabled={exchanging}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white uppercase focus:outline-none focus:border-indigo-500 font-mono"
+            />
+            {coinInput && !isNaN(parseInt(coinInput)) && parseInt(coinInput) >= 500 && (
+              <p className="text-[11px] text-emerald-400 mt-1.5 font-bold animate-fade pl-1">
+                ✓ Value: ${(parseInt(coinInput) / (Number((settings as any).coinsPerDollar) || 1000)).toFixed(2)} USD (ভ্যালু: ${(parseInt(coinInput) / (Number((settings as any).coinsPerDollar) || 1000)).toFixed(2)} USD)
+              </p>
+            )}
+            {coinInput && !isNaN(parseInt(coinInput)) && parseInt(coinInput) < 500 && (
+              <p className="text-[10px] text-rose-450 mt-1 pl-1">
+                ⚠️ Minimum 500 coins are required to convert
+              </p>
+            )}
+          </div>
           <button
             onClick={handleExchangeCoins}
             disabled={exchanging}
-            className="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-650 text-white font-bold text-xs rounded-xl transition active:scale-95 disabled:opacity-50 cursor-pointer"
+            className="px-5 py-2.5 h-10 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-650 text-white font-bold text-xs rounded-xl transition active:scale-95 disabled:opacity-50 cursor-pointer flex items-center justify-center self-start"
           >
             {exchanging ? 'Converting...' : 'Convert'}
           </button>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { 
   Users, Share2, Copy, Trophy, ShieldCheck, Award, BarChart4, 
@@ -35,7 +35,64 @@ export default function ReferralTab({ user, showToast }: ReferralTabProps) {
     </svg>
   `;
 
-  const topReferrers = StoreDB.getLeaderboard('all').slice(0, 5);
+  const [topReferrers, setTopReferrers] = useState<any[]>(() => {
+    return StoreDB.getLeaderboard('all').slice(0, 5);
+  });
+
+  useState(() => {
+    // Sync with the latest user profile initially
+    setTopReferrers(prev => {
+      return prev.map(item => {
+        if (item.uid === user.uid) {
+          return {
+            ...item,
+            referralCount: user.referralCount,
+            totalEarned: user.totalEarned,
+            xp: user.xp
+          };
+        }
+        return item;
+      });
+    });
+  });
+
+  useEffect(() => {
+    // Periodically update some referral counts and total earnings of leaderboard contesters, and sort them dynamically!
+    // Set to 120 seconds (2 minutes) instead of 6 seconds to prevent hyperactive rank-jumping and ensure stable UI!
+    const interval = setInterval(() => {
+      setTopReferrers(prev => {
+        // Create duplicate copy of previous top referrers
+        const clone = prev.map(item => ({ ...item }));
+        
+        // Pick one random contender (avoid the current user to keep their state exact, or let them also grow if simulated!)
+        const targetIdx = Math.floor(Math.random() * clone.length);
+        const targetObj = clone[targetIdx];
+        
+        if (targetObj && targetObj.uid !== user.uid) {
+          // Increment random invites and earnings subtly
+          const changeRefs = Math.random() > 0.8 ? 1 : 0;
+          if (changeRefs > 0) {
+            targetObj.referralCount += changeRefs;
+            targetObj.totalEarned += changeRefs * 0.15; // direct T1 referral share
+            targetObj.xp += changeRefs * 50;
+          }
+        } else if (targetObj) {
+          // If it chose the current logged in user, pull latest real profile counts
+          const latest = StoreDB.getUser(user.uid);
+          if (latest) {
+            targetObj.referralCount = latest.referralCount;
+            targetObj.totalEarned = latest.totalEarned;
+            targetObj.xp = latest.xp;
+          }
+        }
+        
+        // Re-sort the leaderboard so ranks can dynamically swap
+        return clone.sort((a, b) => b.totalEarned - a.totalEarned);
+      });
+    }, 120000);
+
+    return () => clearInterval(interval);
+  }, [user.uid, user.referralCount, user.totalEarned, user.xp]);
 
   return (
     <div id="referrals-tab-root" className="p-4 space-y-4 text-left">
@@ -138,7 +195,60 @@ export default function ReferralTab({ user, showToast }: ReferralTabProps) {
         </div>
       </div>
 
-      {/* 4. REFERRER LEADERBOARD */}
+      {/* 4. USER REFERRAL HISTORY */}
+      <div className="bg-slate-900 border border-slate-850 rounded-2xl p-4">
+        <h4 className="text-[11.5px] uppercase tracking-wider font-bold text-slate-400 mb-3 flex items-center gap-1.5 font-mono">
+          <Users className="w-4 h-4 text-indigo-400 animate-pulse" /> Referral History (আপনার রেফারাল তালিকা)
+        </h4>
+
+        {(() => {
+          const referralHistory = StoreDB.getUserReferrals(user.uid);
+          if (referralHistory.length === 0) {
+            return (
+              <div className="text-center p-6 bg-slate-950/40 rounded-xl border border-slate-900/60 text-slate-500 text-xs italic">
+                You haven't referred anyone yet. Share your code above to get started!
+              </div>
+            );
+          }
+          return (
+            <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+              {referralHistory.map((refUser) => (
+                <div 
+                  key={refUser.uid} 
+                  className="flex items-center justify-between p-2.5 bg-slate-950/45 border border-slate-900/80 rounded-xl hover:border-slate-800 transition"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <img 
+                      src={refUser.photoUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${refUser.username}`} 
+                      alt={refUser.username} 
+                      referrerPolicy="no-referrer"
+                      className="w-7 h-7 rounded-full border border-slate-800"
+                    />
+                    <div>
+                      <span className="text-xs font-bold text-slate-200 block truncate max-w-[150px]">
+                        {refUser.firstName || 'User'}
+                      </span>
+                      <span className="text-[9.5px] text-slate-500 block font-mono">
+                        @{refUser.username || 'unknown'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[9px] text-slate-500 block font-mono">
+                      Joined: {new Date(refUser.joinedAt || Date.now()).toLocaleDateString([], { month: 'short', day: 'numeric', year: '2-digit' })}
+                    </span>
+                    <span className="text-[10px] text-emerald-450 font-black block font-mono">
+                      🟡 {refUser.rewardPoints || 0} Pts
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
+      </div>
+
+      {/* 5. REFERRER LEADERBOARD */}
       <div className="bg-slate-900 border border-slate-850 rounded-2xl p-4">
         <h4 className="text-[11px] uppercase tracking-wider font-bold text-slate-400 mb-3.5 flex items-center gap-1.5">
           <Trophy className="w-4 h-4 text-amber-500" /> Leaderboard Contesters

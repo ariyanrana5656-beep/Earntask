@@ -158,6 +158,32 @@ export default function App() {
     handleRefreshUser();
   }, [activeSimProfileIdx]);
 
+  // Dynamic Real Geolocation correction
+  useEffect(() => {
+    if (currentUser) {
+      // 1. Timezone-based fast correction
+      const currentEst = StoreDB.getEstimatedCountry();
+      if (currentUser.country === 'United States' && currentEst !== 'United States') {
+        const revised = StoreDB.updateUser(currentUser.uid, { country: currentEst });
+        setCurrentUser(revised);
+      }
+      
+      // 2. High-precision background GeoIP check
+      fetch('https://ipapi.co/json/')
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.country_name && currentUser.country !== data.country_name) {
+            const revised = StoreDB.updateUser(currentUser.uid, { country: data.country_name });
+            setCurrentUser(revised);
+            console.log(`[GEOIP] Profile country corrected to ${data.country_name} dynamically.`);
+          }
+        })
+        .catch(err => {
+          console.log("[GEOIP] Silent GeoIP check skipped or blocked:", err.message);
+        });
+    }
+  }, [currentUser?.uid]);
+
   const handleRefreshUser = () => {
     try {
       const selectedSim = MOCK_PROFILES[activeSimProfileIdx];

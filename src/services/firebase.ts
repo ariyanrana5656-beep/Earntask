@@ -71,7 +71,16 @@ export const doc = (dbRef: any, ...args: any[]) => {
 
 export const getDoc = async (docRef: any) => {
   if (isFirebaseAvailable && docRef && docRef.path && !docRef.path.includes('dummy')) {
-    return realGetDoc(docRef);
+    try {
+      return await realGetDoc(docRef);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.GET, docRef?.path);
+      return {
+        exists: () => false,
+        data: () => null,
+        id: docRef?.id || 'dummy-doc',
+      } as any;
+    }
   }
   return {
     exists: () => false,
@@ -82,7 +91,17 @@ export const getDoc = async (docRef: any) => {
 
 export const getDocs = async (colRef: any) => {
   if (isFirebaseAvailable && colRef && colRef.path && !colRef.path.includes('dummy')) {
-    return realGetDocs(colRef);
+    try {
+      return await realGetDocs(colRef);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.LIST, colRef?.path);
+      return {
+        empty: true,
+        size: 0,
+        docs: [],
+        forEach: () => {},
+      } as any;
+    }
   }
   return {
     empty: true,
@@ -94,28 +113,57 @@ export const getDocs = async (colRef: any) => {
 
 export const setDoc = async (docRef: any, data: any, options?: any) => {
   if (isFirebaseAvailable && docRef && docRef.path && !docRef.path.includes('dummy')) {
-    return realSetDoc(docRef, data, options);
+    try {
+      return await realSetDoc(docRef, data, options);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, docRef?.path);
+      return Promise.resolve();
+    }
   }
   return Promise.resolve();
 };
 
 export const updateDoc = async (docRef: any, data: any) => {
   if (isFirebaseAvailable && docRef && docRef.path && !docRef.path.includes('dummy')) {
-    return realUpdateDoc(docRef, data);
+    try {
+      return await realUpdateDoc(docRef, data);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, docRef?.path);
+      return Promise.resolve();
+    }
   }
   return Promise.resolve();
 };
 
 export const deleteDoc = async (docRef: any) => {
   if (isFirebaseAvailable && docRef && docRef.path && !docRef.path.includes('dummy')) {
-    return realDeleteDoc(docRef);
+    try {
+      return await realDeleteDoc(docRef);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, docRef?.path);
+      return Promise.resolve();
+    }
   }
   return Promise.resolve();
 };
 
 export const writeBatch = (dbRef: any) => {
   if (isFirebaseAvailable && dbRef) {
-    return realWriteBatch(dbRef);
+    try {
+      const batchObj = realWriteBatch(dbRef);
+      const originalCommit = batchObj.commit.bind(batchObj);
+      batchObj.commit = async () => {
+        try {
+          return await originalCommit();
+        } catch (err) {
+          handleFirestoreError(err, OperationType.WRITE, 'writeBatchCommitFallback');
+          return Promise.resolve();
+        }
+      };
+      return batchObj;
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, 'writeBatchInitError');
+    }
   }
   const dummyBatch = {
     set: () => dummyBatch,
@@ -128,7 +176,21 @@ export const writeBatch = (dbRef: any) => {
 
 export const onSnapshot = (docRef: any, callback: (snapshot: any) => void, errorCallback?: (error: any) => void) => {
   if (isFirebaseAvailable && docRef && docRef.path && !docRef.path.includes('dummy')) {
-    return realOnSnapshot(docRef, callback, errorCallback);
+    try {
+      return realOnSnapshot(
+        docRef,
+        callback,
+        (err) => {
+          handleFirestoreError(err, OperationType.GET, `onSnapshot/${docRef?.path}`);
+          if (errorCallback) {
+            errorCallback(err);
+          }
+        }
+      );
+    } catch (err) {
+      handleFirestoreError(err, OperationType.GET, `onSnapshotRegister/${docRef?.path}`);
+      return () => {};
+    }
   }
   return () => {};
 };
