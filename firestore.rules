@@ -264,8 +264,14 @@ service cloud.firestore {
 
     // System Settings Document
     match /settings/system {
-      allow get: if isSignedIn();
-      allow create, update, delete: if isAdmin() && isValidSystemSettings(incoming());
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Ad Networks Settings Document
+    match /settings/adNetworks {
+      allow read: if true;
+      allow write: if isAdmin();
     }
   }
 }

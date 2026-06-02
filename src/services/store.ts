@@ -2,11 +2,11 @@ import {
   UserProfile, Task, TaskSubmission, AdOffer, SurveyOffer, 
   WithdrawalRequest, SupportTicket, LeaderboardEntry, Achievement, 
   PromoCode, Contest, AppNotification, Language, TelegramUser, VipTier, DepositRequest,
-  TaskType
+  TaskType, AdNetworkSettings, AdHistoryEntry
 } from '../types';
 import { 
   firestore, auth, handleFirestoreError, OperationType, 
-  collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, writeBatch 
+  collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, writeBatch, onSnapshot 
 } from './firebase';
 
 // Default tasks for task center
@@ -239,9 +239,12 @@ interface LocalDB {
     supportLink?: string;
     depositWalletAddress?: string;
     minDepositAmount?: number;
+    dynamicAds?: AdOffer[];
+    dailyAdsLimit?: number;
   };
   vipTiers: VipTier[];
   achievements: Achievement[];
+  adNetworks?: AdNetworkSettings;
 }
 
 const STORAGE_KEY = 'taskearn_pro_db_v2';
@@ -411,10 +414,30 @@ const buildInitialDB = (): LocalDB => {
       gameSpinRewardMultiplier: 1.0,
       supportLink: 'https://t.me/TaskEarnProSupport',
       depositWalletAddress: 'bKash/Nagad/Rocket (Personal): +8801700112233\nBinance Pay UID: 73927492',
-      minDepositAmount: 2.0
+      minDepositAmount: 2.0,
+      dailyAdsLimit: 25,
+      dynamicAds: [
+        { id: 'ad_monetag_banner_preset', network: 'monetag', format: 'banner', reward: 1.5, cooldownSeconds: 30, title: 'Instant Monetag Banner', sdkScript: `<script src='//libtl.com/sdk.js' data-zone='11082183' data-sdk='show_11082183'></script>`, isActive: true },
+        { id: 'ad_adsterra_socialbar_preset', network: 'adsterra', format: 'popup', reward: 3.0, cooldownSeconds: 45, title: 'Adsterra Social Bar', sdkScript: '', directUrl: '', isActive: true },
+        { id: 'ad_gigapub_preset', network: 'gigapub', format: 'rewarded', reward: 4.5, cooldownSeconds: 60, title: 'GigaPub High-Paying Video', sdkScript: '', directUrl: '', isActive: true }
+      ]
     },
     vipTiers: DEFAULT_VIP_TIERS,
-    achievements: DEFAULT_ACHIEVEMENTS
+    achievements: DEFAULT_ACHIEVEMENTS,
+    adNetworks: {
+      monetag: {
+        enabled: false,
+        bannerZoneId: "",
+        rewardedZoneId: "",
+        interstitialZoneId: ""
+      },
+      gigapub: {
+        enabled: false,
+        bannerPlacementId: "",
+        rewardedPlacementId: "",
+        videoPlacementId: ""
+      }
+    }
   };
 };
 
@@ -499,7 +522,25 @@ export const StoreDB = {
       gameSpinCost: s.gameSpinCost !== undefined ? s.gameSpinCost : 100,
       gameSpinRewardMultiplier: s.gameSpinRewardMultiplier !== undefined ? s.gameSpinRewardMultiplier : 1.0,
       supportLink: s.supportLink || 'https://t.me/TaskEarnProSupport',
-      ...s
+      dailyAdsLimit: s.dailyAdsLimit !== undefined ? s.dailyAdsLimit : 25,
+      ...s,
+      dynamicAds: (() => {
+        const defaultAds = [
+          { id: 'ad_monetag_banner_preset', network: 'monetag', format: 'banner', reward: 1.5, cooldownSeconds: 30, title: 'Instant Monetag Banner', sdkScript: `<script src='//libtl.com/sdk.js' data-zone='11082183' data-sdk='show_11082183'></script>`, isActive: true },
+          { id: 'ad_adsterra_socialbar_preset', network: 'adsterra', format: 'popup', reward: 3.0, cooldownSeconds: 45, title: 'Adsterra Social Bar', sdkScript: '', directUrl: '', isActive: true },
+          { id: 'ad_gigapub_preset', network: 'gigapub', format: 'rewarded', reward: 4.5, cooldownSeconds: 60, title: 'GigaPub High-Paying Video', sdkScript: '', directUrl: '', isActive: true }
+        ];
+        if (!s.dynamicAds || s.dynamicAds.length === 0) {
+          return defaultAds;
+        }
+        const mergedList = [...s.dynamicAds];
+        defaultAds.forEach(defAd => {
+          if (!mergedList.some(item => item.id === defAd.id)) {
+            mergedList.push(defAd);
+          }
+        });
+        return mergedList;
+      })()
     };
   },
   updateSettings: (settings: Partial<LocalDB['systemSettings']>) => {
@@ -511,6 +552,135 @@ export const StoreDB = {
         .catch(err => handleFirestoreError(err, OperationType.WRITE, 'settings/system'));
     }
     return dbState.systemSettings;
+  },
+
+  getAdNetworks: (): AdNetworkSettings => {
+    const db = getDB();
+    const defaultAdNetworks: AdNetworkSettings = {
+      monetag: {
+        enabled: false,
+        bannerZoneId: "",
+        rewardedZoneId: "",
+        interstitialZoneId: ""
+      },
+      gigapub: {
+        enabled: false,
+        bannerPlacementId: "",
+        rewardedPlacementId: "",
+        videoPlacementId: ""
+      }
+    };
+    if (!db.adNetworks) {
+      db.adNetworks = defaultAdNetworks;
+    }
+    // Deep merge to ensure all properties exist
+    db.adNetworks = {
+      monetag: { ...defaultAdNetworks.monetag, ...db.adNetworks.monetag },
+      gigapub: { ...defaultAdNetworks.gigapub, ...db.adNetworks.gigapub }
+    };
+    return db.adNetworks;
+  },
+
+  updateAdNetworks: (adNetworks: Partial<AdNetworkSettings>) => {
+    const dbState = getDB();
+    const current = StoreDB.getAdNetworks();
+    const next: AdNetworkSettings = {
+      monetag: { ...current.monetag, ...adNetworks.monetag },
+      gigapub: { ...current.gigapub, ...adNetworks.gigapub }
+    };
+    dbState.adNetworks = next;
+    saveDB(dbState);
+
+    console.log("[FIREBASE] Saving adNetworks settings to Firestore 'settings/adNetworks'.");
+    if (auth.currentUser) {
+      setDoc(doc(firestore, 'settings', 'adNetworks'), next, { merge: true })
+        .catch(err => handleFirestoreError(err, OperationType.WRITE, 'settings/adNetworks'));
+    }
+    return next;
+  },
+
+  subscribeToSettings: (callback: (settings: any) => void) => {
+    let unsub = () => {};
+    try {
+      const docRef = doc(firestore, 'settings', 'system');
+      unsub = onSnapshot(docRef, (snap) => {
+        if (snap && snap.exists()) {
+          const cloudSettings = snap.data();
+          const dbState = getDB();
+          dbState.systemSettings = { ...dbState.systemSettings, ...cloudSettings };
+          saveDB(dbState);
+          callback(StoreDB.getSettings());
+        }
+      }, (err) => {
+        console.error("Settings real-time listener error", err);
+      });
+    } catch (e) {
+      console.warn("Could not register settings real-time listener", e);
+    }
+    return unsub;
+  },
+
+  subscribeToAdNetworks: (callback: (adNetworks: any) => void) => {
+    let unsub = () => {};
+    try {
+      const docRef = doc(firestore, 'settings', 'adNetworks');
+      unsub = onSnapshot(docRef, (snap) => {
+        if (snap && snap.exists()) {
+          const cloudAdNetworks = snap.data();
+          const dbState = getDB();
+          dbState.adNetworks = { ...dbState.adNetworks, ...cloudAdNetworks };
+          saveDB(dbState);
+          callback(StoreDB.getAdNetworks());
+        }
+      }, (err) => {
+        console.error("adNetworks real-time listener error", err);
+      });
+    } catch (e) {
+      console.warn("Could not register adNetworks real-time listener", e);
+    }
+    return unsub;
+  },
+
+  saveAdHistory: async (userId: string, network: 'monetag' | 'gigapub', format: string, reward: number) => {
+    const dbState = getDB();
+    const entry = {
+      id: `ad_history_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      userId,
+      network,
+      format,
+      reward,
+      timestamp: Date.now()
+    };
+    
+    // Store in local storage or memory history as well
+    const historyKey = `te_adhistory_${userId}`;
+    let hist: any[] = [];
+    try {
+      hist = JSON.parse(localStorage.getItem(historyKey) || '[]');
+    } catch {
+      hist = [];
+    }
+    // Record visual Coins earned (reward is standard dollars e.g. 0.08 -> coins earned is reward * 10 -> wait, let's keep it uniform so we have coins amount)
+    const coinsEarned = Math.round(reward * 10);
+    hist.unshift({ id: entry.id, timestamp: entry.timestamp, reward: coinsEarned, format });
+    try {
+      localStorage.setItem(historyKey, JSON.stringify(hist.slice(0, 10)));
+    } catch (e) {
+      // ignore
+    }
+
+    // Save to Firestore
+    if (auth.currentUser) {
+      setDoc(doc(firestore, 'adHistory', entry.id), entry)
+        .then(() => {
+          console.log(`[FIREBASE] Ad watch history registered in Firestore 'adHistory/${entry.id}'.`);
+        })
+        .catch(err => {
+          handleFirestoreError(err, OperationType.WRITE, `adHistory/${entry.id}`);
+        });
+    }
+    
+    return entry;
   },
 
   // Users
@@ -1509,6 +1679,19 @@ export const StoreDB = {
         state.systemSettings = settingsSnap.data() as LocalDB['systemSettings'];
       } else {
         await setDoc(doc(firestore, 'settings', 'system'), state.systemSettings);
+      }
+      
+      // 5. Ad Networks settings
+      const adNetworksSnap = await getDoc(doc(firestore, 'settings', 'adNetworks'));
+      if (adNetworksSnap.exists()) {
+        state.adNetworks = adNetworksSnap.data() as AdNetworkSettings;
+      } else {
+        const defaultAdNetworks: AdNetworkSettings = {
+          monetag: { enabled: false, bannerZoneId: "", rewardedZoneId: "", interstitialZoneId: "" },
+          gigapub: { enabled: false, bannerPlacementId: "", rewardedPlacementId: "", videoPlacementId: "" }
+        };
+        state.adNetworks = defaultAdNetworks;
+        await setDoc(doc(firestore, 'settings', 'adNetworks'), defaultAdNetworks);
       }
       
       saveDB(state);

@@ -9,7 +9,8 @@ import {
   setDoc as realSetDoc,
   updateDoc as realUpdateDoc,
   deleteDoc as realDeleteDoc,
-  writeBatch as realWriteBatch
+  writeBatch as realWriteBatch,
+  onSnapshot as realOnSnapshot
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
@@ -123,6 +124,13 @@ export const writeBatch = (dbRef: any) => {
     commit: async () => Promise.resolve(),
   };
   return dummyBatch as any;
+};
+
+export const onSnapshot = (docRef: any, callback: (snapshot: any) => void, errorCallback?: (error: any) => void) => {
+  if (isFirebaseAvailable && docRef && docRef.path && !docRef.path.includes('dummy')) {
+    return realOnSnapshot(docRef, callback, errorCallback);
+  }
+  return () => {};
 };
 
 export enum OperationType {

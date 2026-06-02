@@ -106,6 +106,14 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [currentLang, setCurrentLang] = useState<Language>('en');
   const [logoClickCount, setLogoClickCount] = useState(0);
+  const [sysSettings, setSysSettings] = useState(() => StoreDB.getSettings());
+  
+  useEffect(() => {
+    const unsub = StoreDB.subscribeToSettings((updated) => {
+      setSysSettings(updated);
+    });
+    return unsub;
+  }, []);
   
   // Custom toast alert
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -216,12 +224,85 @@ export default function App() {
     }
   };
 
+  // Dynamically inject configured Ad network SDK scripts to the main page body
+  useEffect(() => {
+    if (!sysSettings) return;
+
+    const injectScript = (scriptStr: string | undefined, networkName: string) => {
+      if (!scriptStr) return;
+      const id = `global-ad-script-${networkName}`;
+      
+      // Compare content to find if dynamic settings updated
+      const existing = document.getElementById(id);
+      if (existing) {
+        if (existing.getAttribute('data-raw-content') === scriptStr) {
+          return;
+        }
+        existing.remove();
+        const subScripts = document.querySelectorAll(`[id^="${id}-"]`);
+        subScripts.forEach(el => el.remove());
+      }
+
+      try {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(scriptStr, 'text/html');
+        const scriptTags = doc.querySelectorAll('script');
+
+        scriptTags.forEach((sTag, idx) => {
+          const wrapper = document.createElement('div');
+          wrapper.id = `${id}-${idx}`;
+          wrapper.style.display = 'none';
+
+          const newScript = document.createElement('script');
+          
+          // Copy all attributes
+          Array.from(sTag.attributes).forEach(attr => {
+            let val = attr.value;
+            // Standardize protocol-relative links (e.g. //libtl.com -> https://libtl.com)
+            if (attr.name === 'src' && val.startsWith('//')) {
+              val = 'https:' + val;
+            }
+            newScript.setAttribute(attr.name, val);
+          });
+
+          // Inline scripts support
+          if (sTag.textContent) {
+            newScript.textContent = sTag.textContent;
+          }
+
+          wrapper.appendChild(newScript);
+          document.body.appendChild(wrapper);
+          console.log(`[Ad Injector] Dynamically injected ${networkName} SDK script`);
+        });
+
+        // Save raw content trace
+        const marker = document.createElement('meta');
+        marker.id = id;
+        marker.setAttribute('data-raw-content', scriptStr);
+        document.head.appendChild(marker);
+      } catch (e) {
+        console.error(`Failed to inject dynamic ${networkName} ad script:`, e);
+      }
+    };
+
+    // Dynamically loop and inject ALL user-defined active ad scripts
+    const activeAds = sysSettings.dynamicAds || [];
+    activeAds.forEach((ad) => {
+      if (ad.isActive !== false && ad.sdkScript) {
+        injectScript(ad.sdkScript, ad.id);
+      }
+    });
+
+    injectScript(sysSettings.adMonetagSdkScript, 'legacy-monetag');
+    injectScript(sysSettings.adAdsterraSdkScript, 'legacy-adsterra');
+    injectScript(sysSettings.adCustomSdkScript, 'legacy-custom');
+  }, [viewMode, sysSettings]);
+
   // Translation function helper
   const t = (key: string) => {
     return DICTIONARY[currentLang]?.[key] || DICTIONARY['en']?.[key] || key;
   };
 
-  const sysSettings = StoreDB.getSettings();
   const isMaintenance = sysSettings?.maintenanceMode === true;
 
   if (!currentUser) return null;

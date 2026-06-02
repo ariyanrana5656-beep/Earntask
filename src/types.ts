@@ -51,6 +51,8 @@ export interface UserProfile {
   isBanned: boolean;
   withdrawLocked?: boolean;
   lastGamePlayedAt?: number;
+  lastAdWatchedAt?: number;
+  todayAdsCount?: number;
 }
 
 export type TaskType = 
@@ -107,11 +109,14 @@ export interface TaskSubmission {
 
 export interface AdOffer {
   id: string;
-  network: 'monetag' | 'adsterra' | 'gigapub' | 'propeller' | 'custom';
-  format: 'banner' | 'popup' | 'rewarded' | 'interstitial';
+  network: 'monetag' | 'adsterra' | 'gigapub' | 'propeller' | 'custom' | string;
+  format: 'banner' | 'popup' | 'rewarded' | 'interstitial' | string;
   reward: number;
   cooldownSeconds: number;
   title: string;
+  directUrl?: string;
+  sdkScript?: string;
+  isActive?: boolean;
 }
 
 export interface SurveyOffer {
@@ -221,4 +226,29 @@ export interface DepositRequest {
   reviewedAt?: number;
   adminNote?: string;
 }
+
+export interface AdNetworkSettings {
+  monetag: {
+    enabled: boolean;
+    bannerZoneId: string;
+    rewardedZoneId: string;
+    interstitialZoneId: string;
+  };
+  gigapub: {
+    enabled: boolean;
+    bannerPlacementId: string;
+    rewardedPlacementId: string;
+    videoPlacementId: string;
+  };
+}
+
+export interface AdHistoryEntry {
+  id: string;
+  userId: string;
+  network: 'monetag' | 'gigapub';
+  format: 'banner' | 'rewarded' | 'interstitial' | 'video' | 'native';
+  reward: number;
+  timestamp: number;
+}
+
 

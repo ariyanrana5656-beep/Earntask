@@ -7,7 +7,7 @@ import {
   ExternalLink, Save, RefreshCw, Send, HelpCircle as HelpIcon, Play,
   BarChart2, Bell, Shield, ArrowLeft, Info, Filter, Terminal, CheckCircle, Trophy, ArrowUpRight
 } from 'lucide-react';
-import { UserProfile, Task, WithdrawalRequest, SupportTicket, PromoCode, TaskSubmission, AppNotification, VipTier, Achievement } from '../types';
+import { UserProfile, Task, WithdrawalRequest, SupportTicket, PromoCode, TaskSubmission, AppNotification, VipTier, Achievement, AdOffer } from '../types';
 import { StoreDB } from '../services/store';
 
 interface AdminPanelProps {
@@ -35,6 +35,7 @@ export default function AdminPanel({
   const [allSubmissions, setAllSubmissions] = useState<TaskSubmission[]>([]);
   const [allPromos, setAllPromos] = useState<PromoCode[]>([]);
   const [systemSettings, setSystemSettings] = useState(StoreDB.getSettings());
+  const [adNetworkSettings, setAdNetworkSettings] = useState(() => StoreDB.getAdNetworks());
   const [allVipTiers, setAllVipTiers] = useState<VipTier[]>([]);
   const [allAchievements, setAllAchievements] = useState<Achievement[]>([]);
   const [allDeposits, setAllDeposits] = useState<any[]>([]);
@@ -78,6 +79,16 @@ export default function AdminPanel({
   const [broadcastMsg, setBroadcastMsg] = useState('');
   const [broadcastCategory, setBroadcastCategory] = useState<AppNotification['category']>('system');
 
+  // Dynamic Ads CRUD States
+  const [editingAdId, setEditingAdId] = useState<string | null>(null);
+  const [adFormTitle, setAdFormTitle] = useState('');
+  const [adFormNetwork, setAdFormNetwork] = useState<string>('monetag');
+  const [adFormFormat, setAdFormFormat] = useState<string>('banner');
+  const [adFormReward, setAdFormReward] = useState('1.5');
+  const [adFormCooldown, setAdFormCooldown] = useState('30');
+  const [adFormSdkScript, setAdFormSdkScript] = useState('');
+  const [adFormDirectUrl, setAdFormDirectUrl] = useState('');
+
   // Active Task Editor Campaign State
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editTaskTitle, setEditTaskTitle] = useState('');
@@ -116,6 +127,7 @@ export default function AdminPanel({
     setAllWithdrawals(StoreDB.getWithdrawals());
     setAllTickets(StoreDB.getTickets());
     setSystemSettings(StoreDB.getSettings());
+    setAdNetworkSettings(StoreDB.getAdNetworks());
     setAllSubmissions((StoreDB as any).getSubmissions ? (StoreDB as any).getSubmissions() : []);
     setAllPromos((StoreDB as any).getPromos ? (StoreDB as any).getPromos() : []);
     setAllVipTiers(StoreDB.getVipTiers());
@@ -195,6 +207,117 @@ export default function AdminPanel({
     setVipFormMulti('1.1x');
     setVipFormDesc('');
     setVipFormCost('1500');
+  };
+
+  // Production Ad Networks Saved Handler
+  const handleSaveAdNetworkConfig = (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const updated = StoreDB.updateAdNetworks(adNetworkSettings);
+      setAdNetworkSettings(updated);
+      showToast('🔌 Monetag & GigaPub settings stored in Firebase settings/adNetworks!', 'success');
+    } catch (err: any) {
+      showToast(`Error saving configuration: ${err.message}`, 'error');
+    }
+  };
+
+  // Dynamic Ads CRUD Handlers
+  const handleSaveDynamicAd = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adFormTitle.trim()) {
+      showToast('Ad Title is required.', 'error');
+      return;
+    }
+    const rewardNum = parseFloat(adFormReward) || 1.0;
+    const cooldownNum = parseInt(adFormCooldown) || 30;
+
+    const currentList = systemSettings.dynamicAds || [];
+    let updatedList = [...currentList];
+
+    if (editingAdId) {
+      updatedList = updatedList.map(ad => {
+        if (ad.id === editingAdId) {
+          return {
+            ...ad,
+            title: adFormTitle.trim(),
+            network: adFormNetwork as any,
+            format: adFormFormat as any,
+            reward: rewardNum,
+            cooldownSeconds: cooldownNum,
+            sdkScript: adFormSdkScript.trim(),
+            directUrl: adFormDirectUrl.trim()
+          };
+        }
+        return ad;
+      });
+      showToast('Ad Configuration Updated!', 'success');
+    } else {
+      const newAd: AdOffer = {
+        id: `ad_${Date.now()}`,
+        network: adFormNetwork as any,
+        format: adFormFormat as any,
+        reward: rewardNum,
+        cooldownSeconds: cooldownNum,
+        title: adFormTitle.trim(),
+        sdkScript: adFormSdkScript.trim(),
+        directUrl: adFormDirectUrl.trim(),
+        isActive: true
+      };
+      updatedList.push(newAd);
+      showToast('New Ad Configuration Added!', 'success');
+    }
+
+    StoreDB.updateSettings({ dynamicAds: updatedList });
+    setSystemSettings(StoreDB.getSettings()); // update local state
+    handleClearAdForm();
+  };
+
+  const handleStartEditAd = (ad: AdOffer) => {
+    setEditingAdId(ad.id);
+    setAdFormTitle(ad.title);
+    setAdFormNetwork(ad.network);
+    setAdFormFormat(ad.format);
+    setAdFormReward(ad.reward.toString());
+    setAdFormCooldown(ad.cooldownSeconds.toString());
+    setAdFormSdkScript(ad.sdkScript || '');
+    setAdFormDirectUrl(ad.directUrl || '');
+  };
+
+  const handleDeleteAd = (adId: string) => {
+    if (window.confirm('Are you sure you want to delete this Ad?')) {
+      const currentList = systemSettings.dynamicAds || [];
+      const updatedList = currentList.filter(ad => ad.id !== adId);
+      StoreDB.updateSettings({ dynamicAds: updatedList });
+      setSystemSettings(StoreDB.getSettings());
+      showToast('Ad Deleted Successfully.', 'success');
+      if (editingAdId === adId) {
+        handleClearAdForm();
+      }
+    }
+  };
+
+  const handleToggleAdActive = (adId: string) => {
+    const currentList = systemSettings.dynamicAds || [];
+    const updatedList = currentList.map(ad => {
+      if (ad.id === adId) {
+        return { ...ad, isActive: ad.isActive === undefined ? false : !ad.isActive };
+      }
+      return ad;
+    });
+    StoreDB.updateSettings({ dynamicAds: updatedList });
+    setSystemSettings(StoreDB.getSettings());
+    showToast('Ad Active State Changed!', 'success');
+  };
+
+  const handleClearAdForm = () => {
+    setEditingAdId(null);
+    setAdFormTitle('');
+    setAdFormNetwork('monetag');
+    setAdFormFormat('banner');
+    setAdFormReward('1.5');
+    setAdFormCooldown('30');
+    setAdFormSdkScript('');
+    setAdFormDirectUrl('');
   };
 
   // Achievements CRUD Functions
@@ -2047,6 +2170,22 @@ export default function AdminPanel({
                       </div>
 
                       <div className="p-3 bg-slate-900 border border-slate-800 rounded-2xl space-y-1.5 select-none text-left">
+                        <label className="text-xs text-slate-200 font-bold flex justify-between font-mono leading-normal">
+                          <span>Daily Ad View Limit (প্রতিদিন সর্বোচ্চ কতটি এড দেখতে পারবে)</span>
+                          <span className="text-indigo-400 font-black">{systemSettings.dailyAdsLimit ?? 25} Ads / day</span>
+                        </label>
+                        <p className="text-[10px] text-slate-500 leading-tight">Enforces user daily 24-hour viewing block threshold to restrict click-abuse scripts.</p>
+                        <input
+                          type="number"
+                          min="1"
+                          max="500"
+                          value={systemSettings.dailyAdsLimit ?? 25}
+                          onChange={e => handleToggleSettingsOption('dailyAdsLimit', parseInt(e.target.value) || 25)}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white font-mono focus:outline-none"
+                        />
+                      </div>
+
+                      <div className="p-3 bg-slate-900 border border-slate-800 rounded-2xl space-y-1.5 select-none text-left">
                         <label className="text-xs text-slate-200 font-bold block font-mono">
                           Deposit Address Details (ডিপোজিট এড্রেস ও বাইন্যান্স পে আইডি)
                         </label>
@@ -2152,7 +2291,9 @@ export default function AdminPanel({
                           <span>Game Reward Multiplier (গেম পুরস্কারের গুণিতক)</span>
                           <span className="text-amber-400 font-black">x{(systemSettings.gameSpinRewardMultiplier ?? 1.0).toFixed(1)} Payout</span>
                         </div>
-                        <p className="text-[10px] text-slate-500 leading-tight font-sans">Scale all game payouts (jackpots, mystery chest credits and scratch card wins) using a global factor rate.</p>
+                        <p className="text-[10px] text-slate-500 leading-tight font-sans">
+                          Scale all game payouts (jackpots, mystery chest credits and scratch card wins) using a global factor rate.
+                        </p>
                         <input
                           type="range"
                           min="0.5"
@@ -2166,122 +2307,404 @@ export default function AdminPanel({
                     </div>
                   </div>
 
-                  {/* HIGH CPM AD PLATFORMS SDK & DIRECT LINK CONTROL CENTER */}
-                  <div className="bg-slate-950 border border-slate-850 p-5 rounded-3xl space-y-4 shadow">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Sparkles className="w-5 h-5 text-indigo-400 animate-pulse" />
+                  {/* DYNAMIC MULTIPLE HIGH CPM AD PLATFORMS & SDK SCRIPT MANAGER */}
+                  <div className="bg-slate-950 border border-slate-850 p-5 rounded-3xl space-y-5 shadow">
+                    <div className="flex justify-between items-start gap-4 pb-3 border-b border-slate-850">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-5 h-5 text-indigo-400 animate-pulse" />
+                        <div>
+                          <h4 className="text-xs font-black uppercase text-slate-100 font-mono tracking-wider leading-none">
+                            📺 Dynamic Multi-Ad Manager & Script Integrator
+                          </h4>
+                          <p className="text-[10px] text-slate-400 mt-1.5 leading-normal">
+                            Configure, edit, and instantly deploy multiple high-paying ad scripts (Monetag, Adsterra, Propeller, Google Ads, etc.). Scripts run natively on the user side for 100% active visibility and anti-iframe bypass!
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleClearAdForm}
+                        className="py-1 px-3 bg-indigo-950/40 hover:bg-indigo-900/40 text-[9.5px] text-indigo-400 border border-indigo-900/50 rounded-lg font-mono font-bold uppercase transition"
+                      >
+                        Reset Form
+                      </button>
+                    </div>
+
+                    {/* Ads List Dashboard */}
+                    <div className="space-y-3">
+                      <h5 className="text-[10.5px] font-mono uppercase font-black text-slate-400 tracking-wider">
+                        Active Configured Ad Inventories ({ (systemSettings.dynamicAds || []).length })
+                      </h5>
+
+                      {!(systemSettings.dynamicAds && systemSettings.dynamicAds.length > 0) ? (
+                        <p className="text-[11px] text-slate-500 italic p-4 text-center bg-slate-900/20 border border-slate-850 rounded-2xl">
+                          No custom ads configured yet. Use the builder form below to configure instant Monetag or Adsterra scripts!
+                        </p>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {systemSettings.dynamicAds.map((ad: AdOffer) => {
+                            const isAdActive = ad.isActive !== false;
+                            return (
+                              <div
+                                key={ad.id}
+                                className={`p-3 bg-slate-900 border rounded-2xl flex flex-col justify-between space-y-3 transition ${
+                                  isAdActive ? 'border-indigo-950' : 'border-slate-850 opacity-60'
+                                }`}
+                              >
+                                <div>
+                                  <div className="flex justify-between items-start gap-1">
+                                    <span className="text-[8.5px] font-mono p-0.5 px-2 bg-slate-950 border border-slate-850 text-indigo-400 font-extrabold uppercase rounded">
+                                      {ad.network} • {ad.format}
+                                    </span>
+                                    <button
+                                      onClick={() => handleToggleAdActive(ad.id)}
+                                      className={`text-[9.5px] px-1.5 py-0.5 rounded font-bold font-mono transition ${
+                                        isAdActive ? 'bg-emerald-950/40 text-emerald-450 border border-emerald-900/30' : 'bg-slate-950 text-slate-500 border border-slate-850'
+                                      }`}
+                                    >
+                                      {isAdActive ? '● ACTIVE' : '○ INACTIVE'}
+                                    </button>
+                                  </div>
+                                  <h6 className="text-xs font-extrabold text-slate-200 mt-2 font-sans">{ad.title}</h6>
+                                  
+                                  <div className="grid grid-cols-2 gap-1.5 mt-2 pt-2 border-t border-slate-850/40 text-[10px] font-mono text-slate-450">
+                                    <div>
+                                      <span>Reward:</span> <b className="text-amber-500">🟡 +{ad.reward * 10} Coins</b>
+                                    </div>
+                                    <div>
+                                      <span>Cooldown:</span> <b className="text-indigo-400">{ad.cooldownSeconds}s</b>
+                                    </div>
+                                  </div>
+
+                                  {ad.sdkScript ? (
+                                    <div className="mt-2 text-[9px] font-mono text-slate-500 bg-slate-950 p-1.5 rounded border border-slate-850 line-clamp-2 overflow-hidden h-9">
+                                      {ad.sdkScript}
+                                    </div>
+                                  ) : ad.directUrl ? (
+                                    <div className="mt-2 text-[9px] font-mono text-slate-500 bg-slate-950 p-1.5 rounded border border-slate-850 truncate leading-relaxed">
+                                      🔗 {ad.directUrl}
+                                    </div>
+                                  ) : (
+                                    <p className="mt-2 text-[9px] italic text-rose-500">No script or link active. Interactive view only.</p>
+                                  )}
+                                </div>
+
+                                <div className="flex items-center gap-2 pt-2 border-t border-slate-850/40 justify-end">
+                                  <button
+                                    onClick={() => handleStartEditAd(ad)}
+                                    className="p-1 px-3 bg-slate-950 hover:bg-slate-850 text-slate-400 border border-slate-800 text-[10px] rounded-lg transition"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteAd(ad.id)}
+                                    className="p-1 px-3 bg-rose-950/20 hover:bg-rose-900/20 text-rose-450 text-[10px] rounded-lg border border-rose-900/20 transition"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Builder Form Box */}
+                    <form onSubmit={handleSaveDynamicAd} className="p-4 bg-slate-900/40 border border-slate-850 rounded-2xl space-y-4 text-left">
+                      <span className="text-[9.5px] uppercase font-bold font-mono text-slate-400 tracking-wider flex items-center gap-1.5">
+                        <Plus className="w-3.5 h-3.5 text-indigo-400" />
+                        {editingAdId ? `📝 Edit Ad Configuration: ID [${editingAdId.slice(0, 8)}]` : '✨ Add New Dynamic Ad Script / CPM Link'}
+                      </span>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[9.5px] uppercase font-black text-slate-450 block mb-1">Ad Inventory Title (বিজ্ঞাপন শিরোনাম)</label>
+                          <input
+                            type="text"
+                            value={adFormTitle}
+                            onChange={e => setAdFormTitle(e.target.value)}
+                            placeholder="E.g., Monetag Social Bar Top, Premium Adsterra"
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:border-indigo-505 focus:outline-none"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[9.5px] uppercase font-black text-slate-450 block mb-1">Ad Network (বিজ্ঞাপন নেটওয়ার্ক)</label>
+                            <select
+                              value={adFormNetwork}
+                              onChange={e => setAdFormNetwork(e.target.value)}
+                              className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none"
+                            >
+                              <option value="monetag">Monetag</option>
+                              <option value="adsterra">Adsterra</option>
+                              <option value="propeller">PropellerAds</option>
+                              <option value="gigapub">GigaPub</option>
+                              <option value="custom">Custom Partner</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-[9.5px] uppercase font-black text-slate-450 block mb-1">Format (বিজ্ঞাপন ফরম্যাট)</label>
+                            <select
+                              value={adFormFormat}
+                              onChange={e => setAdFormFormat(e.target.value)}
+                              className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none"
+                            >
+                              <option value="banner">Banner / SmartTag</option>
+                              <option value="popup">Popunder / Click</option>
+                              <option value="rewarded">Rewarded Video</option>
+                              <option value="interstitial">Interstitial Page</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[9.5px] uppercase font-black text-slate-450 block mb-1">Reward Value Factor (পুরস্কার গুণক: 1.5 = 15 coins)</label>
+                          <input
+                            type="number"
+                            step="0.1"
+                            value={adFormReward}
+                            onChange={e => setAdFormReward(e.target.value)}
+                            placeholder="Defaults to 1.5"
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 font-mono focus:border-indigo-505 focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9.5px] uppercase font-black text-slate-450 block mb-1">Cooldown seconds (কুলডাউন সেকেন্ডস)</label>
+                          <input
+                            type="number"
+                            value={adFormCooldown}
+                            onChange={e => setAdFormCooldown(e.target.value)}
+                            placeholder="Defaults to 30"
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 font-mono focus:border-indigo-505 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-[9.5px] uppercase font-black text-slate-450 block mb-1">Direct Ad Link / Click URL (অপশনাল সরাসরি লিঙ্ক)</label>
+                        <input
+                          type="text"
+                          value={adFormDirectUrl}
+                          onChange={e => setAdFormDirectUrl(e.target.value)}
+                          placeholder="E.g., https://delivery.monetag.com/direct/link?id=XXXXX or Adsterra Direct Link"
+                          className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 font-mono focus:border-indigo-505 focus:outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between items-center mb-1">
+                          <label className="text-[9.5px] uppercase font-black text-indigo-400 block font-mono">
+                            HTML SDK script Embed Code or Responsive Widget HTML (বিজ্ঞাপন স্ক্রিপ্ট কোড)
+                          </label>
+                          <span className="text-[8.5px] text-slate-500 uppercase font-mono">Will load natively to top window</span>
+                        </div>
+                        <textarea
+                          rows={3}
+                          value={adFormSdkScript}
+                          onChange={e => setAdFormSdkScript(e.target.value)}
+                          placeholder="E.g., <script src='https://libtl.com/sdk.js' data-zone='11082183' data-sdk='show_11082183'></script>"
+                          className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-[10.5px] text-slate-250 font-mono focus:border-indigo-505 focus:outline-none"
+                        />
+                        <span className="text-[9px] text-slate-500 block leading-tight mt-0.5">
+                          You can paste multiple lines here. Example: Monetag Banners, Adsterra SocialBar, or script-based smart widgets. High efficiency native runtime!
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2.5 pt-2">
+                        <button
+                          type="submit"
+                          className="flex-1 py-2 px-4 bg-gradient-to-r from-indigo-650 to-purple-650 hover:from-indigo-600 hover:to-purple-600 text-xs font-black text-white rounded-xl transition shadow flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          <Save className="w-4 h-4" />
+                          {editingAdId ? 'UPDATE AD OFFER CONFIG' : 'DEPLOY ACTIVE AD TO CENTER'}
+                        </button>
+                        {editingAdId && (
+                          <button
+                            type="button"
+                            onClick={handleClearAdForm}
+                            className="py-2 px-4 bg-slate-950 hover:bg-slate-900 text-slate-400 text-xs font-bold rounded-xl border border-slate-800 transition"
+                          >
+                            Cancel
+                          </button>
+                        )}
+                      </div>
+                    </form>
+                  </div>
+
+                  {/* PRODUCTION-READY AD NETWORKS CORE (MONETAG & GIGAPUB CORES) */}
+                  <div className="bg-slate-950 border border-slate-850 p-5 rounded-3xl space-y-5 shadow animate-fade">
+                    <div className="flex items-center gap-2 pb-3 border-b border-slate-850">
+                      <Sliders className="w-5 h-5 text-indigo-400 animate-pulse" />
                       <div>
                         <h4 className="text-xs font-black uppercase text-slate-100 font-mono tracking-wider leading-none">
-                          📺 Dynamic Ad networks & SDK Core Settings
+                          🔌 Production Monetag & GigaPub Ad SDK Integrators
                         </h4>
-                        <p className="text-[10px] text-slate-400 mt-1 leading-normal">
-                          Configuring a **Direct Link** opens it when user clicks watch. Inserting **SDK Embed Script / HTML** automatically injects, runs and renders real advertisement banners/videos in the ad player modal.
+                        <p className="text-[10px] text-slate-400 mt-1.5 leading-normal">
+                          Enable ad channels, configure Zone IDs / Placement Keys, and track user impressions with high-fidelity analytics stored directly in Firestore <b>settings/adNetworks</b>.
                         </p>
                       </div>
                     </div>
 
-                    <div className="space-y-4 pt-2 border-t border-slate-850">
-                      {/* 1. MONETAG NETWORKS INTEGRATOR */}
-                      <div className="p-3.5 bg-slate-900/60 border border-slate-850 rounded-2xl space-y-3">
-                        <span className="text-[10px] uppercase font-bold text-indigo-400 font-mono tracking-widest block bg-indigo-950/20 w-fit p-1 px-2 rounded">
-                          🎯 MONETAG AD NETWORK INTEGRATOR
-                        </span>
-                        <div className="space-y-2">
-                          <div>
-                            <label className="text-[9.5px] uppercase font-bold text-slate-450 block">Monetag Direct Link (direct ads url)</label>
+                    <form onSubmit={handleSaveAdNetworkConfig} className="space-y-5 text-left">
+                      
+                      {/* MONETAG AD CONTEXT */}
+                      <div className="p-4 bg-slate-900/30 border border-slate-850 rounded-2xl space-y-4">
+                        <div className="flex items-center justify-between border-b border-slate-850/40 pb-2">
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-indigo-500 animate-ping" />
+                            <h5 className="text-[11.5px] font-black uppercase text-indigo-400 font-mono tracking-wider">
+                              Monetag Official SDK Integration
+                            </h5>
+                          </div>
+                          
+                          <label className="relative inline-flex items-center cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={adNetworkSettings.monetag.enabled}
+                              onChange={e => setAdNetworkSettings({
+                                ...adNetworkSettings,
+                                monetag: { ...adNetworkSettings.monetag, enabled: e.target.checked }
+                              })}
+                              className="sr-only peer"
+                            />
+                            <div className="w-9 h-5 bg-slate-850 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top peer-checked:bg-indigo-600 peer-checked:after:bg-white" style={{ position: "relative" }} />
+                            <span className="ml-2 text-[10px] font-bold font-mono uppercase text-slate-400 peer-checked:text-indigo-400">
+                              {adNetworkSettings.monetag.enabled ? 'ON' : 'OFF'}
+                            </span>
+                          </label>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          <div className="space-y-1">
+                            <label className="text-[9px] uppercase font-bold text-slate-450 block">Banner Zone ID</label>
                             <input
                               type="text"
-                              value={systemSettings.adMonetagDirectUrl || ''}
-                              onChange={e => handleToggleSettingsOption('adMonetagDirectUrl', e.target.value)}
-                              placeholder="E.g., https://delivery.monetag.com/direct/link?id=XXXX"
-                              className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 font-mono focus:outline-none focus:border-indigo-505"
+                              value={adNetworkSettings.monetag.bannerZoneId}
+                              onChange={e => setAdNetworkSettings({
+                                ...adNetworkSettings,
+                                monetag: { ...adNetworkSettings.monetag, bannerZoneId: e.target.value.trim() }
+                              })}
+                              placeholder="E.g., 11082183"
+                              className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white placeholder-slate-600 font-mono focus:outline-none"
                             />
                           </div>
-                          <div>
-                            <label className="text-[9.5px] uppercase font-bold text-slate-450 block">Monetag SDK Banner / Popunder HTML Script Embed Code</label>
-                            <textarea
-                              rows={2}
-                              value={systemSettings.adMonetagSdkScript || ''}
-                              onChange={e => handleToggleSettingsOption('adMonetagSdkScript', e.target.value)}
-                              placeholder='E.g., <script src="https://alwingulla.com/act/files/micro.tag.min.js"></script>'
-                              className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-[10.5px] text-slate-200 font-mono focus:outline-none focus:border-indigo-505"
+
+                          <div className="space-y-1">
+                            <label className="text-[9px] uppercase font-bold text-slate-450 block">Rewarded Video Zone ID</label>
+                            <input
+                              type="text"
+                              value={adNetworkSettings.monetag.rewardedZoneId}
+                              onChange={e => setAdNetworkSettings({
+                                ...adNetworkSettings,
+                                monetag: { ...adNetworkSettings.monetag, rewardedZoneId: e.target.value.trim() }
+                              })}
+                              placeholder="E.g., 11082184"
+                              className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white placeholder-slate-600 font-mono focus:outline-none"
                             />
-                            <span className="text-[9px] text-slate-500 italic block mt-1">Paste standard script script snippets or responsive widget html tags here.</span>
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[9px] uppercase font-bold text-slate-450 block">Interstitial Zone ID</label>
+                            <input
+                              type="text"
+                              value={adNetworkSettings.monetag.interstitialZoneId}
+                              onChange={e => setAdNetworkSettings({
+                                ...adNetworkSettings,
+                                monetag: { ...adNetworkSettings.monetag, interstitialZoneId: e.target.value.trim() }
+                              })}
+                              placeholder="E.g., 11082185"
+                              className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white placeholder-slate-600 font-mono focus:outline-none"
+                            />
                           </div>
                         </div>
                       </div>
 
-                      {/* 2. ADSTERRA NETWORKS INTEGRATOR */}
-                      <div className="p-3.5 bg-slate-900/60 border border-slate-850 rounded-2xl space-y-3">
-                        <span className="text-[10px] uppercase font-bold text-teal-400 font-mono tracking-widest block bg-teal-950/20 w-fit p-1 px-2 rounded">
-                          🎯 ADSTERRA AD NETWORK INTEGRATOR
-                        </span>
-                        <div className="space-y-2">
-                          <div>
-                            <label className="text-[9.5px] uppercase font-bold text-slate-455 block">Adsterra Direct Link (direct click URL)</label>
+                      {/* GIGAPUB AD CONTEXT */}
+                      <div className="p-4 bg-slate-900/30 border border-slate-850 rounded-2xl space-y-4">
+                        <div className="flex items-center justify-between border-b border-slate-850/40 pb-2">
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-purple-500 animate-ping" />
+                            <h5 className="text-[11.5px] font-black uppercase text-purple-400 font-mono tracking-wider">
+                              GigaPub Official SDK Integration
+                            </h5>
+                          </div>
+
+                          <label className="relative inline-flex items-center cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={adNetworkSettings.gigapub.enabled}
+                              onChange={e => setAdNetworkSettings({
+                                ...adNetworkSettings,
+                                gigapub: { ...adNetworkSettings.gigapub, enabled: e.target.checked }
+                              })}
+                              className="sr-only peer"
+                            />
+                            <div className="w-9 h-5 bg-slate-850 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top peer-checked:bg-purple-600 peer-checked:after:bg-white" style={{ position: "relative" }} />
+                            <span className="ml-2 text-[10px] font-bold font-mono uppercase text-slate-400 peer-checked:text-purple-400">
+                              {adNetworkSettings.gigapub.enabled ? 'ON' : 'OFF'}
+                            </span>
+                          </label>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          <div className="space-y-1">
+                            <label className="text-[9px] uppercase font-bold text-slate-450 block">Banner Placement ID</label>
                             <input
                               type="text"
-                              value={systemSettings.adAdsterraDirectUrl || ''}
-                              onChange={e => handleToggleSettingsOption('adAdsterraDirectUrl', e.target.value)}
-                              placeholder="E.g., https://www.profitablecpmrate.com/xxxxx"
-                              className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 font-mono focus:outline-none focus:border-teal-505"
+                              value={adNetworkSettings.gigapub.bannerPlacementId}
+                              onChange={e => setAdNetworkSettings({
+                                ...adNetworkSettings,
+                                gigapub: { ...adNetworkSettings.gigapub, bannerPlacementId: e.target.value.trim() }
+                              })}
+                              placeholder="E.g., gp_banner_101"
+                              className="w-full bg-slate-955 border border-slate-800 rounded-lg p-2 text-xs text-white placeholder-slate-600 font-mono focus:outline-none"
                             />
                           </div>
-                          <div>
-                            <label className="text-[9.5px] uppercase font-bold text-slate-455 block">Adsterra Banner / SocialBar SDK Script Embed Code</label>
-                            <textarea
-                              rows={2}
-                              value={systemSettings.adAdsterraSdkScript || ''}
-                              onChange={e => handleToggleSettingsOption('adAdsterraSdkScript', e.target.value)}
-                              placeholder='E.g. <script type="text/javascript">atOptions = { "key": "xxx" }; ...</script>'
-                              className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-[10.5px] text-slate-200 font-mono focus:outline-none focus:border-teal-505"
+
+                          <div className="space-y-1">
+                            <label className="text-[9px] uppercase font-bold text-slate-450 block">Rewarded Video ID</label>
+                            <input
+                              type="text"
+                              value={adNetworkSettings.gigapub.rewardedPlacementId}
+                              onChange={e => setAdNetworkSettings({
+                                ...adNetworkSettings,
+                                gigapub: { ...adNetworkSettings.gigapub, rewardedPlacementId: e.target.value.trim() }
+                              })}
+                              placeholder="E.g., gp_reward_202"
+                              className="w-full bg-slate-955 border border-slate-800 rounded-lg p-2 text-xs text-white placeholder-slate-600 font-mono focus:outline-none"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[9px] uppercase font-bold text-slate-450 block">Stand-alone Video ID</label>
+                            <input
+                              type="text"
+                              value={adNetworkSettings.gigapub.videoPlacementId}
+                              onChange={e => setAdNetworkSettings({
+                                ...adNetworkSettings,
+                                gigapub: { ...adNetworkSettings.gigapub, videoPlacementId: e.target.value.trim() }
+                              })}
+                              placeholder="E.g., gp_video_303"
+                              className="w-full bg-slate-955 border border-slate-800 rounded-lg p-2 text-xs text-white placeholder-slate-600 font-mono focus:outline-none"
                             />
                           </div>
                         </div>
                       </div>
 
-                      {/* 3. CUSTOM AD NETWORK CAMPAIGN */}
-                      <div className="p-3.5 bg-slate-900/60 border border-slate-850 rounded-2xl space-y-3">
-                        <span className="text-[10px] uppercase font-bold text-amber-400 font-mono tracking-widest block bg-amber-955/20 w-fit p-1 px-2 rounded">
-                          🎯 CUSTOM PROPRIETARY ADVERTISER / CAMPAIGN
-                        </span>
-                        <div className="space-y-2">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            <div>
-                              <label className="text-[9.5px] uppercase font-bold text-slate-450 block font-sans">Campaign Custom Name</label>
-                              <input
-                                type="text"
-                                value={systemSettings.adCustomTitle || ''}
-                                onChange={e => handleToggleSettingsOption('adCustomTitle', e.target.value)}
-                                placeholder="E.g., PropellerAds Retargeted, Google CPM"
-                                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-[9.5px] uppercase font-bold text-slate-450 block">Direct Ad Campaign Link</label>
-                              <input
-                                type="text"
-                                value={systemSettings.adCustomDirectUrl || ''}
-                                onChange={e => handleToggleSettingsOption('adCustomDirectUrl', e.target.value)}
-                                placeholder="E.g., https://mybestpayofflink.com/click"
-                                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 font-mono focus:outline-none"
-                              />
-                            </div>
-                          </div>
-                          <div>
-                            <label className="text-[9.5px] uppercase font-bold text-slate-450 block">SDK/Embed Widget HTML/JS Script Code</label>
-                            <textarea
-                              rows={2}
-                              value={systemSettings.adCustomSdkScript || ''}
-                              onChange={e => handleToggleSettingsOption('adCustomSdkScript', e.target.value)}
-                              placeholder="E.g., <iframe width='100%' height='250' src='https://...' />"
-                              className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-[10.5px] text-slate-200 font-mono focus:outline-none"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                      <button
+                        type="submit"
+                        className="w-full py-3 bg-gradient-to-r from-indigo-650 to-purple-650 hover:from-indigo-600 hover:to-purple-600 text-xs font-black text-white rounded-xl uppercase tracking-wider shadow transition duration-200 cursor-pointer text-center"
+                      >
+                        SAVE & SYNC SDK CONFIGURATIONS TO FIRESTORE
+                      </button>
+
+                    </form>
                   </div>
+                  
                 </div>
               )}
 

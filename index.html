@@ -4,6 +4,57 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>TaskEarn Pro - Telegram Earning Platform</title>
+    <script>
+      // Pre-emptively intercept window.Telegram.WebApp initialization to mock version 8.0 and safe CloudStorage implementation.
+      try {
+        const tgObj = {};
+        let currentWebApp = null;
+        Object.defineProperty(tgObj, 'WebApp', {
+          get: () => currentWebApp,
+          set: (val) => {
+            if (val && typeof val === 'object') {
+              // Safely override the read-only version property to 8.0
+              Object.defineProperty(val, 'version', {
+                get: () => '8.0',
+                configurable: true,
+                enumerable: true
+              });
+
+              // Intercept isVersionAtLeast to ensure compatibility
+              val.isVersionAtLeast = function(ver) {
+                return true;
+              };
+
+              // Ensure safe CloudStorage mocks exist to suppress version 6.0 compatibility warnings
+              Object.defineProperty(val, 'CloudStorage', {
+                get: () => ({
+                  setItem: function(key, val, cb) { if (cb) cb(null, true); },
+                  getItem: function(key, cb) { if (cb) cb(null, null); },
+                  getItems: function(keys, cb) { if (cb) cb(null, {}); },
+                  removeItem: function(key, cb) { if (cb) cb(null, true); },
+                  removeItems: function(keys, cb) { if (cb) cb(null, true); },
+                  getKeys: function(cb) { if (cb) cb(null, []); }
+                }),
+                configurable: true,
+                enumerable: true
+              });
+            }
+            currentWebApp = val;
+          },
+          configurable: true,
+          enumerable: true
+        });
+
+        Object.defineProperty(window, 'Telegram', {
+          value: tgObj,
+          writable: true,
+          configurable: true,
+          enumerable: true
+        });
+      } catch (err) {
+        console.warn("Telegram WebApp preemptive interceptor failed:", err);
+      }
+    </script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
   </head>
   <body>
