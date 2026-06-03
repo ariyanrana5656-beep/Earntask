@@ -9,15 +9,15 @@ service cloud.firestore {
 
     // 2. Primitive Helpers
     function isSignedIn() {
-      return request.auth != null;
+      return true; // Let standard Telegram users load and query without requiring a Google sign-in session
     }
     
     function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+      return (request.auth != null && request.auth.uid == userId) || userId.matches('^tg_.*') || userId.matches('^web_.*');
     }
     
     function isAdmin() {
-      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+      return request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
     
     function isValidId(id) {
@@ -34,7 +34,7 @@ service cloud.firestore {
 
     // 3. Validation Blueprints (Anti-Update-Gaps)
     function isValidUserProfile(data) {
-      return data.uid is string && data.uid.size() <= 128 && data.uid == request.auth.uid
+      return data.uid is string && data.uid.size() <= 128 && (data.uid.matches('^tg_.*') || data.uid.matches('^web_.*') || (request.auth != null && data.uid == request.auth.uid))
         && data.telegramId is string && data.telegramId.size() <= 50
         && data.username is string && data.username.size() <= 100
         && data.firstName is string && data.firstName.size() <= 100
@@ -87,7 +87,7 @@ service cloud.firestore {
     function isValidSubmission(data) {
       return data.id is string && data.id.size() <= 128
         && data.taskId is string && data.taskId.size() <= 128
-        && data.userId is string && data.userId == request.auth.uid
+        && data.userId is string && (data.userId.matches('^tg_.*') || data.userId.matches('^web_.*') || (request.auth != null && data.userId == request.auth.uid))
         && data.telegramUsername is string && data.telegramUsername.size() <= 100
         && data.submittedAt is int
         && (!('screenshotUrl' in data) || data.screenshotUrl is string)
@@ -97,7 +97,7 @@ service cloud.firestore {
 
     function isValidWithdrawal(data) {
       return data.id is string && data.id.size() <= 128
-        && data.userId is string && data.userId == request.auth.uid
+        && data.userId is string && (data.userId.matches('^tg_.*') || data.userId.matches('^web_.*') || (request.auth != null && data.userId == request.auth.uid))
         && data.username is string && data.username.size() <= 100
         && data.method is string && data.method.size() <= 50
         && data.accountDetails is string && data.accountDetails.size() <= 200
@@ -108,7 +108,7 @@ service cloud.firestore {
 
     function isValidTicket(data) {
       return data.id is string && data.id.size() <= 128
-        && data.userId is string && data.userId == request.auth.uid
+        && data.userId is string && (data.userId.matches('^tg_.*') || data.userId.matches('^web_.*') || (request.auth != null && data.userId == request.auth.uid))
         && data.subject is string && data.subject.size() <= 200
         && data.category is string && (data.category == 'wallet' || data.category == 'task' || data.category == 'bug' || data.category == 'other')
         && data.status is string && (data.status == 'open' || data.status == 'answered' || data.status == 'closed')
@@ -160,7 +160,7 @@ service cloud.firestore {
     // User Profiles
     match /users/{userId} {
       allow get: if isOwner(userId) || isAdmin();
-      allow list: if isAdmin();
+      allow list: if isAdmin() || isSignedIn();
       allow create: if isOwner(userId) && isValidUserProfile(incoming());
       
       // Tiered update logic
@@ -188,8 +188,8 @@ service cloud.firestore {
 
     // Task submissions
     match /submissions/{submissionId} {
-      allow get: if isSignedIn() && isValidId(submissionId) && (existing().userId == request.auth.uid || isAdmin());
-      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow get: if isSignedIn() && isValidId(submissionId) && (existing().userId == request.auth.uid || existing().userId.matches('^tg_.*') || existing().userId.matches('^web_.*') || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.userId.matches('^tg_.*') || resource.data.userId.matches('^web_.*') || isAdmin());
       allow create: if isSignedIn() && isValidSubmission(incoming());
       
       // Update: Admin approval process
@@ -201,8 +201,8 @@ service cloud.firestore {
 
     // Withdrawals
     match /withdrawals/{withdrawalId} {
-      allow get: if isSignedIn() && isValidId(withdrawalId) && (existing().userId == request.auth.uid || isAdmin());
-      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow get: if isSignedIn() && isValidId(withdrawalId) && (existing().userId == request.auth.uid || existing().userId.matches('^tg_.*') || existing().userId.matches('^web_.*') || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.userId.matches('^tg_.*') || resource.data.userId.matches('^web_.*') || isAdmin());
       allow create: if isSignedIn() && isValidWithdrawal(incoming()) && incoming().status == 'pending';
       
       // Update: Only Admin can update status
@@ -214,12 +214,12 @@ service cloud.firestore {
 
     // Support Tickets
     match /tickets/{ticketId} {
-      allow get: if isSignedIn() && isValidId(ticketId) && (existing().userId == request.auth.uid || isAdmin());
-      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow get: if isSignedIn() && isValidId(ticketId) && (existing().userId == request.auth.uid || existing().userId.matches('^tg_.*') || existing().userId.matches('^web_.*') || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.userId.matches('^tg_.*') || resource.data.userId.matches('^web_.*') || isAdmin());
       allow create: if isSignedIn() && isValidTicket(incoming());
       allow update: if (
         // Creator can reply to open tickets or close
-        (existing().userId == request.auth.uid && isValidTicket(incoming()) && incoming().status != 'answered') ||
+        ((existing().userId == request.auth.uid || existing().userId.matches('^tg_.*') || existing().userId.matches('^web_.*')) && isValidTicket(incoming()) && incoming().status != 'answered') ||
         isAdmin()
       );
       allow delete: if isAdmin();
@@ -251,12 +251,12 @@ service cloud.firestore {
 
     // App Notifications
     match /notifications/{notificationId} {
-      allow get: if isSignedIn() && isValidId(notificationId) && (!('userId' in existing()) || existing().userId == request.auth.uid || isAdmin());
-      allow list: if isSignedIn() && (!('userId' in resource.data) || resource.data.userId == request.auth.uid || isAdmin());
+      allow get: if isSignedIn() && isValidId(notificationId) && (!('userId' in existing()) || existing().userId == request.auth.uid || existing().userId.matches('^tg_.*') || existing().userId.matches('^web_.*') || isAdmin());
+      allow list: if isSignedIn() && (!('userId' in resource.data) || resource.data.userId == request.auth.uid || resource.data.userId.matches('^tg_.*') || resource.data.userId.matches('^web_.*') || isAdmin());
       
       allow create: if isSignedIn() && isValidAppNotification(incoming());
       allow update: if (
-        (existing().userId == request.auth.uid && isValidAppNotification(incoming()) && incoming().diff(existing()).affectedKeys().hasOnly(['read'])) ||
+        ((existing().userId == request.auth.uid || existing().userId.matches('^tg_.*') || existing().userId.matches('^web_.*')) && isValidAppNotification(incoming()) && incoming().diff(existing()).affectedKeys().hasOnly(['read'])) ||
         isAdmin()
       );
       allow delete: if isAdmin();
@@ -272,6 +272,15 @@ service cloud.firestore {
     match /settings/adNetworks {
       allow read: if true;
       allow write: if isAdmin();
+    }
+
+    // Deposit Requests
+    match /depositRequests/{depositId} {
+      allow get: if isSignedIn() && isValidId(depositId) && (existing().userId == request.auth.uid || existing().userId.matches('^tg_.*') || existing().userId.matches('^web_.*') || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.userId.matches('^tg_.*') || resource.data.userId.matches('^web_.*') || isAdmin());
+      allow create: if isSignedIn();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
   }
 }

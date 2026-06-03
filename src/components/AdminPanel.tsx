@@ -123,7 +123,15 @@ export default function AdminPanel({
     }
   }, [isAdminAuth]);
 
-  const loadAdminCollections = () => {
+  const [syncingCloud, setSyncingCloud] = useState(false);
+
+  const loadAdminCollections = async () => {
+    setSyncingCloud(true);
+    if ((StoreDB as any).syncAllAdminCollections) {
+      await (StoreDB as any).syncAllAdminCollections();
+    }
+    setSyncingCloud(false);
+
     setAllUsers(StoreDB.getAllUsers());
     setAllTasks(StoreDB.getAllAdminTasks());
     setAllWithdrawals(StoreDB.getWithdrawals());

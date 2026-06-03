@@ -548,7 +548,7 @@ export const StoreDB = {
     const dbState = getDB();
     dbState.systemSettings = { ...dbState.systemSettings, ...settings };
     saveDB(dbState);
-    if (auth.currentUser) {
+    if (firestore) {
       setDoc(doc(firestore, 'settings', 'system'), dbState.systemSettings, { merge: true })
         .catch(err => handleFirestoreError(err, OperationType.WRITE, 'settings/system'));
     }
@@ -593,7 +593,7 @@ export const StoreDB = {
     saveDB(dbState);
 
     console.log("[FIREBASE] Saving adNetworks settings to Firestore 'settings/adNetworks'.");
-    if (auth.currentUser) {
+    if (firestore) {
       setDoc(doc(firestore, 'settings', 'adNetworks'), next, { merge: true })
         .catch(err => handleFirestoreError(err, OperationType.WRITE, 'settings/adNetworks'));
     }
@@ -671,7 +671,7 @@ export const StoreDB = {
     }
 
     // Save to Firestore
-    if (auth.currentUser) {
+    if (firestore) {
       setDoc(doc(firestore, 'adHistory', entry.id), entry)
         .then(() => {
           console.log(`[FIREBASE] Ad watch history registered in Firestore 'adHistory/${entry.id}'.`);
@@ -799,7 +799,7 @@ export const StoreDB = {
     db.notifications.unshift(welcomeNoti);
 
     saveDB(db);
-    if (auth.currentUser) {
+    if (firestore) {
       setDoc(doc(firestore, 'users', uid), newProfile)
         .catch(err => handleFirestoreError(err, OperationType.WRITE, `users/${uid}`));
       setDoc(doc(firestore, 'notifications', welcomeNoti.id), welcomeNoti)
@@ -814,7 +814,7 @@ export const StoreDB = {
     dbState.users[uid] = { ...dbState.users[uid], ...fields };
     saveDB(dbState);
     // Sync to Firestore if Firebase is active
-    if (auth.currentUser) {
+    if (firestore) {
       setDoc(doc(firestore, 'users', uid), dbState.users[uid], { merge: true })
         .catch(err => handleFirestoreError(err, OperationType.WRITE, `users/${uid}`));
     }
@@ -948,7 +948,7 @@ export const StoreDB = {
     };
     dbState.tasks.unshift(newTask);
     saveDB(dbState);
-    if (auth.currentUser) {
+    if (firestore) {
       setDoc(doc(firestore, 'tasks', newTask.id), newTask)
         .catch(err => handleFirestoreError(err, OperationType.WRITE, `tasks/${newTask.id}`));
     }
@@ -996,7 +996,7 @@ export const StoreDB = {
     db.users[userId] = user;
     saveDB(db);
 
-    if (auth.currentUser) {
+    if (firestore) {
       setDoc(doc(firestore, 'users', userId), user, { merge: true })
         .catch(err => handleFirestoreError(err, OperationType.WRITE, `users/${userId}`));
       setDoc(doc(firestore, 'tasks', newTask.id), newTask)
@@ -1017,7 +1017,7 @@ export const StoreDB = {
     db.tasks = db.tasks.map(t => t.id === taskId ? task : t);
     saveDB(db);
 
-    if (auth.currentUser) {
+    if (firestore) {
       setDoc(doc(firestore, 'tasks', taskId), task, { merge: true })
         .catch(err => handleFirestoreError(err, OperationType.WRITE, `tasks/${taskId}`));
     }
@@ -1044,7 +1044,7 @@ export const StoreDB = {
           user.balance += refundUsd;
         }
         db.users[task.creatorId] = user;
-        if (auth.currentUser) {
+        if (firestore) {
           setDoc(doc(firestore, 'users', task.creatorId), user, { merge: true })
             .catch(err => handleFirestoreError(err, OperationType.WRITE, `users/${task.creatorId}`));
         }
@@ -1054,7 +1054,7 @@ export const StoreDB = {
     db.tasks = db.tasks.map(t => t.id === taskId ? task : t);
     saveDB(db);
 
-    if (auth.currentUser) {
+    if (firestore) {
       setDoc(doc(firestore, 'tasks', taskId), task, { merge: true })
         .catch(err => handleFirestoreError(err, OperationType.WRITE, `tasks/${taskId}`));
     }
@@ -1065,7 +1065,7 @@ export const StoreDB = {
     dbState.tasks = dbState.tasks.map(t => t.id === taskId ? { ...t, ...fields } : t);
     saveDB(dbState);
     const updated = dbState.tasks.find(t => t.id === taskId);
-    if (auth.currentUser && updated) {
+    if (firestore && updated) {
       setDoc(doc(firestore, 'tasks', taskId), updated, { merge: true })
         .catch(err => handleFirestoreError(err, OperationType.WRITE, `tasks/${taskId}`));
     }
@@ -1075,7 +1075,7 @@ export const StoreDB = {
     const dbState = getDB();
     dbState.tasks = dbState.tasks.filter(t => t.id !== taskId);
     saveDB(dbState);
-    if (auth.currentUser) {
+    if (firestore) {
       deleteDoc(doc(firestore, 'tasks', taskId))
         .catch(err => handleFirestoreError(err, OperationType.DELETE, `tasks/${taskId}`));
     }
@@ -1191,7 +1191,7 @@ export const StoreDB = {
     }
 
     saveDB(db);
-    if (auth.currentUser) {
+    if (firestore) {
       setDoc(doc(firestore, 'submissions', newSub.id), newSub)
         .catch(err => handleFirestoreError(err, OperationType.WRITE, `submissions/${newSub.id}`));
       if (db.users[userId]) {
@@ -1267,7 +1267,7 @@ export const StoreDB = {
     }
 
     saveDB(db);
-    if (auth.currentUser) {
+    if (firestore) {
       setDoc(doc(firestore, 'submissions', subId), sub, { merge: true })
         .catch(err => handleFirestoreError(err, OperationType.WRITE, `submissions/${subId}`));
       if (db.users[sub.userId]) {
@@ -1323,7 +1323,7 @@ export const StoreDB = {
     db.notifications.unshift(withNoti);
 
     saveDB(db);
-    if (auth.currentUser) {
+    if (firestore) {
       setDoc(doc(firestore, 'withdrawals', newReq.id), newReq)
         .catch(err => handleFirestoreError(err, OperationType.WRITE, `withdrawals/${newReq.id}`));
       setDoc(doc(firestore, 'users', userId), user, { merge: true })
@@ -1372,7 +1372,7 @@ export const StoreDB = {
     }
 
     saveDB(db);
-    if (auth.currentUser) {
+    if (firestore) {
       setDoc(doc(firestore, 'withdrawals', withdrawId), req, { merge: true })
         .catch(err => handleFirestoreError(err, OperationType.WRITE, `withdrawals/${withdrawId}`));
       if (user) {
@@ -1413,7 +1413,7 @@ export const StoreDB = {
     });
 
     saveDB(dbState);
-    if (auth.currentUser) {
+    if (firestore) {
       setDoc(doc(firestore, 'promoCodes', promo.id), promo, { merge: true })
         .catch(err => handleFirestoreError(err, OperationType.WRITE, `promoCodes/${promo.id}`));
       setDoc(doc(firestore, 'users', userId), user, { merge: true })
@@ -1435,7 +1435,7 @@ export const StoreDB = {
     };
     dbState.promoCodes.unshift(newPromo);
     saveDB(dbState);
-    if (auth.currentUser) {
+    if (firestore) {
       setDoc(doc(firestore, 'promoCodes', newPromo.id), newPromo)
         .catch(err => handleFirestoreError(err, OperationType.WRITE, `promoCodes/${newPromo.id}`));
     }
@@ -1446,7 +1446,7 @@ export const StoreDB = {
     const dbState = getDB();
     dbState.promoCodes = dbState.promoCodes.filter(p => p.id !== promoId);
     saveDB(dbState);
-    if (auth.currentUser) {
+    if (firestore) {
       deleteDoc(doc(firestore, 'promoCodes', promoId))
         .catch(err => handleFirestoreError(err, OperationType.WRITE, `promoCodes/${promoId}`));
     }
@@ -1476,7 +1476,7 @@ export const StoreDB = {
     };
     db.tickets.unshift(newTicket);
     saveDB(db);
-    if (auth.currentUser) {
+    if (firestore) {
       setDoc(doc(firestore, 'tickets', newTicket.id), newTicket)
         .catch(err => handleFirestoreError(err, OperationType.WRITE, `tickets/${newTicket.id}`));
     }
@@ -1497,7 +1497,7 @@ export const StoreDB = {
     });
     saveDB(db);
     const updated = db.tickets.find(t => t.id === ticketId);
-    if (auth.currentUser && updated) {
+    if (firestore && updated) {
       setDoc(doc(firestore, 'tickets', ticketId), updated, { merge: true })
         .catch(err => handleFirestoreError(err, OperationType.WRITE, `tickets/${ticketId}`));
     }
@@ -1607,7 +1607,7 @@ export const StoreDB = {
 
     db.depositRequests.unshift(newReg);
     saveDB(db);
-    if (auth.currentUser) {
+    if (firestore) {
       setDoc(doc(firestore, 'depositRequests', newReg.id), newReg)
         .catch(err => handleFirestoreError(err, OperationType.WRITE, `depositRequests/${newReg.id}`));
     }
@@ -1647,7 +1647,7 @@ export const StoreDB = {
           userId: req.userId
         };
         db.notifications.unshift(noti);
-        if (auth.currentUser) {
+        if (firestore) {
           setDoc(doc(firestore, 'notifications', noti.id), noti)
             .catch(err => handleFirestoreError(err, OperationType.WRITE, `notifications/${noti.id}`));
         }
@@ -1663,21 +1663,21 @@ export const StoreDB = {
           userId: req.userId
         };
         db.notifications.unshift(noti);
-        if (auth.currentUser) {
+        if (firestore) {
           setDoc(doc(firestore, 'notifications', noti.id), noti)
             .catch(err => handleFirestoreError(err, OperationType.WRITE, `notifications/${noti.id}`));
         }
       }
       
       db.users[req.userId] = user;
-      if (auth.currentUser) {
+      if (firestore) {
         setDoc(doc(firestore, 'users', user.uid), user, { merge: true })
           .catch(err => handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}`));
       }
     }
 
     saveDB(db);
-    if (auth.currentUser) {
+    if (firestore) {
       setDoc(doc(firestore, 'depositRequests', req.id), req, { merge: true })
         .catch(err => handleFirestoreError(err, OperationType.WRITE, `depositRequests/${req.id}`));
     }
@@ -1707,7 +1707,7 @@ export const StoreDB = {
     db.notifications.unshift(noti);
 
     saveDB(db);
-    if (auth.currentUser) {
+    if (firestore) {
       setDoc(doc(firestore, 'depositRequests', req.id), req, { merge: true })
         .catch(err => handleFirestoreError(err, OperationType.WRITE, `depositRequests/${req.id}`));
       setDoc(doc(firestore, 'notifications', noti.id), noti)
@@ -1771,7 +1771,7 @@ export const StoreDB = {
   },
 
   syncFromCloud: async (userId: string): Promise<UserProfile | null> => {
-    if (!auth.currentUser) return null;
+    if (!firestore) return null;
     try {
       const state = getDB();
       
@@ -1785,59 +1785,103 @@ export const StoreDB = {
         // Does not exist on cloud, upload existing local shape
         await setDoc(userRef, state.users[userId]);
       }
+
+      // Check if user is a database admin
+      let isUserAdmin = false;
+      try {
+        const adminSnap = await getDoc(doc(firestore, 'admins', userId));
+        isUserAdmin = adminSnap.exists();
+        console.log(`[FIREBASE] Admin verification for ${userId}:`, isUserAdmin);
+      } catch (e) {
+        console.log("[FIREBASE] Standard user admin check done (non-admin):", e);
+      }
       
       // 2. Fetch tasks
-      const tasksSnap = await getDocs(collection(firestore, 'tasks'));
-      if (!tasksSnap.empty) {
-        const cloudTasks: Task[] = [];
-        tasksSnap.forEach(docSnap => {
-          cloudTasks.push(docSnap.data() as Task);
-        });
-        state.tasks = cloudTasks;
-      } else {
-        // Upload default tasks
-        const batch = writeBatch(firestore);
-        state.tasks.forEach(t => {
-          batch.set(doc(firestore, 'tasks', t.id), t);
-        });
-        await batch.commit();
+      try {
+        const tasksSnap = await getDocs(collection(firestore, 'tasks'));
+        if (!tasksSnap.empty) {
+          const cloudTasks: Task[] = [];
+          tasksSnap.forEach(docSnap => {
+            cloudTasks.push(docSnap.data() as Task);
+          });
+          state.tasks = cloudTasks;
+        } else if (isUserAdmin) {
+          // Upload default tasks (optional - requires admin/write permissions)
+          try {
+            const batch = writeBatch(firestore);
+            state.tasks.forEach(t => {
+              batch.set(doc(firestore, 'tasks', t.id), t);
+            });
+            await batch.commit();
+          } catch (e) {
+            console.log("[FIREBASE] Gracefully skipped uploading default tasks (requires admin rights):", e);
+          }
+        }
+      } catch (err) {
+        console.warn("[FIREBASE] Failed to read or initialize tasks collection:", err);
       }
 
       // 3. Fetch Promo Codes
-      const promoSnap = await getDocs(collection(firestore, 'promoCodes'));
-      if (!promoSnap.empty) {
-        const cloudPromos: PromoCode[] = [];
-        promoSnap.forEach(docSnap => {
-          cloudPromos.push(docSnap.data() as PromoCode);
-        });
-        state.promoCodes = cloudPromos;
-      } else {
-        const batch = writeBatch(firestore);
-        state.promoCodes.forEach(p => {
-          batch.set(doc(firestore, 'promoCodes', p.id), p);
-        });
-        await batch.commit();
+      try {
+        const promoSnap = await getDocs(collection(firestore, 'promoCodes'));
+        if (!promoSnap.empty) {
+          const cloudPromos: PromoCode[] = [];
+          promoSnap.forEach(docSnap => {
+            cloudPromos.push(docSnap.data() as PromoCode);
+          });
+          state.promoCodes = cloudPromos;
+        } else if (isUserAdmin) {
+          try {
+            const batch = writeBatch(firestore);
+            state.promoCodes.forEach(p => {
+              batch.set(doc(firestore, 'promoCodes', p.id), p);
+            });
+            await batch.commit();
+          } catch (e) {
+            console.log("[FIREBASE] Gracefully skipped uploading default promo codes (requires admin rights):", e);
+          }
+        }
+      } catch (err) {
+        console.warn("[FIREBASE] Failed to read or initialize promo codes collection:", err);
       }
       
       // 4. Settings
-      const settingsSnap = await getDoc(doc(firestore, 'settings', 'system'));
-      if (settingsSnap.exists()) {
-        state.systemSettings = settingsSnap.data() as LocalDB['systemSettings'];
-      } else {
-        await setDoc(doc(firestore, 'settings', 'system'), state.systemSettings);
+      try {
+        const settingsSnap = await getDoc(doc(firestore, 'settings', 'system'));
+        if (settingsSnap.exists()) {
+          state.systemSettings = settingsSnap.data() as LocalDB['systemSettings'];
+        } else if (isUserAdmin) {
+          try {
+            await setDoc(doc(firestore, 'settings', 'system'), state.systemSettings);
+          } catch (e) {
+            console.log("[FIREBASE] Gracefully skipped uploading default system settings (requires admin rights):", e);
+          }
+        }
+      } catch (err) {
+        console.warn("[FIREBASE] Failed to read or initialize system settings:", err);
       }
       
       // 5. Ad Networks settings
-      const adNetworksSnap = await getDoc(doc(firestore, 'settings', 'adNetworks'));
-      if (adNetworksSnap.exists()) {
-        state.adNetworks = adNetworksSnap.data() as AdNetworkSettings;
-      } else {
-        const defaultAdNetworks: AdNetworkSettings = {
-          monetag: { enabled: false, bannerZoneId: "", rewardedZoneId: "", interstitialZoneId: "" },
-          gigapub: { enabled: false, bannerPlacementId: "", rewardedPlacementId: "", videoPlacementId: "" }
-        };
-        state.adNetworks = defaultAdNetworks;
-        await setDoc(doc(firestore, 'settings', 'adNetworks'), defaultAdNetworks);
+      try {
+        const adNetworksSnap = await getDoc(doc(firestore, 'settings', 'adNetworks'));
+        if (adNetworksSnap.exists()) {
+          state.adNetworks = adNetworksSnap.data() as AdNetworkSettings;
+        } else {
+          const defaultAdNetworks: AdNetworkSettings = {
+            monetag: { enabled: false, bannerZoneId: "", rewardedZoneId: "", interstitialZoneId: "" },
+            gigapub: { enabled: false, bannerPlacementId: "", rewardedPlacementId: "", videoPlacementId: "" }
+          };
+          state.adNetworks = defaultAdNetworks;
+          if (isUserAdmin) {
+            try {
+              await setDoc(doc(firestore, 'settings', 'adNetworks'), defaultAdNetworks);
+            } catch (e) {
+              console.log("[FIREBASE] Gracefully skipped uploading default adNetworks settings (requires admin rights):", e);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("[FIREBASE] Failed to read or initialize adNetworks settings:", err);
       }
       
       saveDB(state);
@@ -1845,6 +1889,80 @@ export const StoreDB = {
     } catch (error) {
       handleFirestoreError(error, OperationType.GET, 'syncFromCloud');
       return null;
+    }
+  },
+
+  syncAllAdminCollections: async (): Promise<boolean> => {
+    if (!firestore) return false;
+    try {
+      const state = getDB();
+
+      // 1. Fetch all users
+      const usersSnap = await getDocs(collection(firestore, 'users'));
+      if (usersSnap && !usersSnap.empty) {
+        usersSnap.forEach(docSnap => {
+          const user = docSnap.data() as UserProfile;
+          if (user.uid) {
+            state.users[user.uid] = user;
+          }
+        });
+      }
+
+      // 2. Fetch all submissions
+      const submissionsSnap = await getDocs(collection(firestore, 'submissions'));
+      if (submissionsSnap && !submissionsSnap.empty) {
+        const cloudSubmissions: TaskSubmission[] = [];
+        submissionsSnap.forEach(docSnap => {
+          cloudSubmissions.push(docSnap.data() as TaskSubmission);
+        });
+        state.submissions = cloudSubmissions;
+      }
+
+      // 3. Fetch all withdrawals
+      const withdrawalsSnap = await getDocs(collection(firestore, 'withdrawals'));
+      if (withdrawalsSnap && !withdrawalsSnap.empty) {
+        const cloudWithdrawals: WithdrawalRequest[] = [];
+        withdrawalsSnap.forEach(docSnap => {
+          cloudWithdrawals.push(docSnap.data() as WithdrawalRequest);
+        });
+        state.withdrawals = cloudWithdrawals;
+      }
+
+      // 4. Fetch all tickets
+      const ticketsSnap = await getDocs(collection(firestore, 'tickets'));
+      if (ticketsSnap && !ticketsSnap.empty) {
+        const cloudTickets: SupportTicket[] = [];
+        ticketsSnap.forEach(docSnap => {
+          cloudTickets.push(docSnap.data() as SupportTicket);
+        });
+        state.tickets = cloudTickets;
+      }
+
+      // 5. Fetch all deposits
+      const depositsSnap = await getDocs(collection(firestore, 'depositRequests'));
+      if (depositsSnap && !depositsSnap.empty) {
+        const cloudDeposits: DepositRequest[] = [];
+        depositsSnap.forEach(docSnap => {
+          cloudDeposits.push(docSnap.data() as DepositRequest);
+        });
+        state.depositRequests = cloudDeposits;
+      }
+
+      // 6. Fetch promo codes
+      const promoSnap = await getDocs(collection(firestore, 'promoCodes'));
+      if (promoSnap && !promoSnap.empty) {
+        const cloudPromos: PromoCode[] = [];
+        promoSnap.forEach(docSnap => {
+          cloudPromos.push(docSnap.data() as PromoCode);
+        });
+        state.promoCodes = cloudPromos;
+      }
+
+      saveDB(state);
+      return true;
+    } catch (err) {
+      handleFirestoreError(err, OperationType.GET, 'syncAllAdminCollections');
+      return false;
     }
   }
 };

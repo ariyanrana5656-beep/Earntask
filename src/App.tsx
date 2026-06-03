@@ -261,6 +261,16 @@ export default function App() {
       }
     }
 
+    // Background Firestore Sync on App Startup for real-time multiplayer coordination
+    if (activeUserUid) {
+      StoreDB.syncFromCloud(activeUserUid).then((refreshed) => {
+        if (refreshed) {
+          setCurrentUser(refreshed);
+          setCurrentLang(refreshed.language);
+        }
+      }).catch(e => console.warn("[FIREBASE] Background startup sync error:", e));
+    }
+
     // Asynchronously try to apply and verify the affiliate code to the active session
     if (activeUserUid && startParam) {
       setTimeout(() => {
