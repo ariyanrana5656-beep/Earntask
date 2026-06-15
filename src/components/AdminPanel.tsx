@@ -35,7 +35,16 @@ export default function AdminPanel({
   const [allSubmissions, setAllSubmissions] = useState<TaskSubmission[]>([]);
   const [allPromos, setAllPromos] = useState<PromoCode[]>([]);
   const [systemSettings, setSystemSettings] = useState(StoreDB.getSettings());
+  const [draftSettings, setDraftSettings] = useState<any>(() => StoreDB.getSettings());
   const [adNetworkSettings, setAdNetworkSettings] = useState(() => StoreDB.getAdNetworks());
+
+  useEffect(() => {
+    if (systemSettings) {
+      setDraftSettings({ ...systemSettings });
+    }
+  }, [systemSettings]);
+
+  const currentSettings = draftSettings || systemSettings || {};
   const [allVipTiers, setAllVipTiers] = useState<VipTier[]>([]);
   const [allAchievements, setAllAchievements] = useState<Achievement[]>([]);
   const [allDeposits, setAllDeposits] = useState<any[]>([]);
@@ -136,7 +145,9 @@ export default function AdminPanel({
     setAllTasks(StoreDB.getAllAdminTasks());
     setAllWithdrawals(StoreDB.getWithdrawals());
     setAllTickets(StoreDB.getTickets());
-    setSystemSettings(StoreDB.getSettings());
+    const currentS = StoreDB.getSettings();
+    setSystemSettings(currentS);
+    setDraftSettings(currentS);
     setAdNetworkSettings(StoreDB.getAdNetworks());
     setAllSubmissions((StoreDB as any).getSubmissions ? (StoreDB as any).getSubmissions() : []);
     setAllPromos((StoreDB as any).getPromos ? (StoreDB as any).getPromos() : []);
@@ -737,10 +748,30 @@ export default function AdminPanel({
     }
   };
 
-  const handleToggleSettingsOption = (field: any, value: any) => {
-    StoreDB.updateSettings({ [field]: value });
-    showToast('Platform settings updated successfully!', 'success');
-    loadAdminCollections();
+  const handleDraftSettingsChange = (field: string, value: any) => {
+    setDraftSettings((prev: any) => {
+      const updated = {
+        ...(prev || systemSettings || {}),
+        [field]: value
+      };
+      return updated;
+    });
+  };
+
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+
+  const handleSaveSystemSettings = async () => {
+    if (!draftSettings) return;
+    setIsSavingSettings(true);
+    try {
+      StoreDB.updateSettings(draftSettings);
+      showToast('প্ল্যাটফর্ম সেটিংস সফলভাবে আপডেট করা হয়েছে!', 'success');
+      await loadAdminCollections();
+    } catch (err: any) {
+      showToast(`সেটিংস সেভ করতে সমস্যা হয়েছে: ${err.message}`, 'error');
+    } finally {
+      setIsSavingSettings(false);
+    }
   };
 
   const handleSeedMockDataDiagnostic = () => {
@@ -2074,6 +2105,46 @@ export default function AdminPanel({
               {/* TAB 8: GLOBAL SETTINGS SWITCHES & UNIFIED BROADCASTER */}
               {activeTab === 'settings' && (
                 <div className="space-y-4 animate-fade">
+                  {/* Unsaved Changes Save Action Banner */}
+                  {JSON.stringify(draftSettings) !== JSON.stringify(systemSettings) && (
+                    <div id="settings-save-warning-banner" className="sticky top-0 z-20 bg-amber-500/10 border border-amber-500/30 p-4 rounded-3xl flex flex-col md:flex-row items-center justify-between gap-3.5 shadow-lg backdrop-blur-md animate-fade-in">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-amber-500/20 text-amber-500 rounded-full flex items-center justify-center animate-pulse border border-amber-500/20">
+                          <AlertTriangle className="w-5 h-5" />
+                        </div>
+                        <div className="text-left space-y-0.5">
+                          <p className="text-xs text-amber-400 font-extrabold flex items-center gap-1.5 font-sans leading-none">
+                            Unsaved Settings Changes Detected! (পরিবর্তনসমূহ সংরক্ষণ করা হয়নি)
+                          </p>
+                          <p className="text-[10px] text-slate-400 leading-normal">
+                            You have modified configurations. Save changes to update the live system.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2.5 w-full md:w-auto">
+                        <button
+                          type="button"
+                          onClick={() => setDraftSettings({ ...systemSettings })}
+                          className="flex-1 md:flex-none px-4 py-2 bg-slate-900 hover:bg-slate-850 text-slate-350 border border-slate-800 text-xs font-black uppercase rounded-2xl transition"
+                        >
+                          Discard (বাতিল করুন)
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isSavingSettings}
+                          onClick={handleSaveSystemSettings}
+                          className="flex-1 md:flex-none px-6 py-2 bg-emerald-500 hover:bg-emerald-555 text-emerald-950 font-black text-xs uppercase cursor-pointer rounded-2xl shadow-md shadow-emerald-900/30 transition flex items-center justify-center gap-1.5"
+                        >
+                          {isSavingSettings ? (
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Save className="w-3.5 h-3.5" />
+                          )}
+                          Save Changes (সংরক্ষণ করুন)
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   {/* UNIFIED BROADCAST NOTIFICATIONS MODULE */}
                   <form onSubmit={handleDispatchNotificationBroadcast} className="bg-slate-950 border border-slate-850 p-4 rounded-3xl space-y-3.5 shadow">
                     <h4 className="text-xs font-black text-indigo-400 flex items-center gap-1.5 uppercase font-mono tracking-widest leading-none">
@@ -2141,29 +2212,29 @@ export default function AdminPanel({
 
                         <button
                           type="button"
-                          onClick={() => handleToggleSettingsOption('maintenanceMode', !systemSettings.maintenanceMode)}
+                          onClick={() => handleDraftSettingsChange('maintenanceMode', !currentSettings.maintenanceMode)}
                           className={`text-[9.5px] font-black uppercase p-1.5 px-3 rounded-lg border transition ${
-                            systemSettings.maintenanceMode
+                            currentSettings.maintenanceMode
                               ? 'bg-rose-550/15 border-rose-900 text-rose-500'
                               : 'bg-slate-950 border-slate-850 text-slate-450'
                           }`}
                         >
-                          {systemSettings.maintenanceMode ? 'LOCKED (ON)' : 'UNLOCKED (OFF)'}
+                          {currentSettings.maintenanceMode ? 'LOCKED (ON)' : 'UNLOCKED (OFF)'}
                         </button>
                       </div>
 
                       <div className="p-3 bg-slate-900 border border-slate-800 rounded-2xl space-y-1.5 select-none">
                         <label className="text-xs text-slate-200 font-bold flex justify-between font-mono leading-normal">
                           <span>Minimum Referrals constraint (উইথড্র করতে সর্বনিম্ন রেফারেল)</span>
-                          <span className="text-amber-400 font-black">{systemSettings.minReferrals || 0} Referrals</span>
+                          <span className="text-amber-400 font-black">{currentSettings.minReferrals || 0} Referrals</span>
                         </label>
                         <p className="text-[10px] text-slate-500 leading-tight">Users must invite at least this number of active referrals before being allowed to request a payout.</p>
                         <input
                           type="range"
                           min="0"
                           max="30"
-                          value={systemSettings.minReferrals || 0}
-                          onChange={e => handleToggleSettingsOption('minReferrals', parseInt(e.target.value))}
+                          value={currentSettings.minReferrals || 0}
+                          onChange={e => handleDraftSettingsChange('minReferrals', parseInt(e.target.value) || 0)}
                           className="w-full accent-amber-550 cursor-pointer mt-1"
                         />
                       </div>
@@ -2171,14 +2242,14 @@ export default function AdminPanel({
                       <div className="space-y-1">
                         <label className="text-[11px] text-slate-450 flex justify-between font-mono font-bold leading-normal">
                           <span>Level 1 Affiliate Revenue Share Ratio</span>
-                          <span className="text-indigo-400">{systemSettings.commissionL1}% commission</span>
+                          <span className="text-indigo-400">{currentSettings.commissionL1 ?? 10}% commission</span>
                         </label>
                         <input
                           type="range"
                           min="5"
                           max="40"
-                          value={systemSettings.commissionL1}
-                          onChange={e => handleToggleSettingsOption('commissionL1', parseInt(e.target.value))}
+                          value={currentSettings.commissionL1 ?? 10}
+                          onChange={e => handleDraftSettingsChange('commissionL1', parseInt(e.target.value) || 5)}
                           className="w-full accent-indigo-550"
                         />
                       </div>
@@ -2186,14 +2257,14 @@ export default function AdminPanel({
                       <div className="space-y-1">
                         <label className="text-[11px] text-slate-450 flex justify-between font-mono font-bold leading-normal">
                           <span>Level 2 Affiliate Revenue Share Ratio</span>
-                          <span className="text-purple-400">{systemSettings.commissionL2}% commission</span>
+                          <span className="text-purple-400">{currentSettings.commissionL2 ?? 5}% commission</span>
                         </label>
                         <input
                           type="range"
                           min="1"
                           max="20"
-                          value={systemSettings.commissionL2}
-                          onChange={e => handleToggleSettingsOption('commissionL2', parseInt(e.target.value))}
+                          value={currentSettings.commissionL2 ?? 5}
+                          onChange={e => handleDraftSettingsChange('commissionL2', parseInt(e.target.value) || 1)}
                           className="w-full accent-purple-550"
                         />
                       </div>
@@ -2201,15 +2272,15 @@ export default function AdminPanel({
                       <div className="p-3 bg-slate-900 border border-slate-800 rounded-2xl space-y-1.5 select-none text-left">
                         <label className="text-xs text-slate-200 font-bold flex justify-between font-mono leading-normal">
                           <span>Minimum Deposit to Unlock Withdrawal (উইথড্র করতে সর্বনিম্ন ডিপোজিট)</span>
-                          <span className="text-amber-400 font-black">${((systemSettings as any).minDepositAmount || 2.0).toFixed(2)} USD</span>
+                          <span className="text-amber-400 font-black">${((currentSettings as any).minDepositAmount || 2.0).toFixed(2)} USD</span>
                         </label>
                         <p className="text-[10px] text-slate-500 leading-tight">Amount user must submit in transaction confirmation to fulfill unlock requirement.</p>
                         <input
                           type="number"
                           step="0.01"
                           min="0.1"
-                          value={(systemSettings as any).minDepositAmount || 2.0}
-                          onChange={e => handleToggleSettingsOption('minDepositAmount', parseFloat(e.target.value) || 2.0)}
+                          value={(currentSettings as any).minDepositAmount || 2.0}
+                          onChange={e => handleDraftSettingsChange('minDepositAmount', parseFloat(e.target.value) || 2.0)}
                           className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white font-mono focus:outline-none"
                         />
                       </div>
@@ -2217,15 +2288,15 @@ export default function AdminPanel({
                       <div className="p-3 bg-slate-900 border border-slate-800 rounded-2xl space-y-1.5 select-none text-left">
                         <label className="text-xs text-slate-200 font-bold flex justify-between font-mono leading-normal">
                           <span>Daily Ad View Limit (প্রতিদিন সর্বোচ্চ কতটি এড দেখতে পারবে)</span>
-                          <span className="text-indigo-400 font-black">{systemSettings.dailyAdsLimit ?? 25} Ads / day</span>
+                          <span className="text-indigo-400 font-black">{currentSettings.dailyAdsLimit ?? 25} Ads / day</span>
                         </label>
                         <p className="text-[10px] text-slate-500 leading-tight">Enforces user daily 24-hour viewing block threshold to restrict click-abuse scripts.</p>
                         <input
                           type="number"
                           min="1"
                           max="500"
-                          value={systemSettings.dailyAdsLimit ?? 25}
-                          onChange={e => handleToggleSettingsOption('dailyAdsLimit', parseInt(e.target.value) || 25)}
+                          value={currentSettings.dailyAdsLimit ?? 25}
+                          onChange={e => handleDraftSettingsChange('dailyAdsLimit', parseInt(e.target.value) || 25)}
                           className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white font-mono focus:outline-none"
                         />
                       </div>
@@ -2237,8 +2308,8 @@ export default function AdminPanel({
                         <p className="text-[10px] text-slate-500 leading-tight">Admin bKash, Nagad numbers, list of credentials, or Binance details shown to user when prompted to unlock.</p>
                         <textarea
                           rows={3}
-                          value={(systemSettings as any).depositWalletAddress || ''}
-                          onChange={e => handleToggleSettingsOption('depositWalletAddress', e.target.value)}
+                          value={(currentSettings as any).depositWalletAddress || ''}
+                          onChange={e => handleDraftSettingsChange('depositWalletAddress', e.target.value)}
                           placeholder="E.g., bKash Personal: +88017XXXXXXXX&#10;Nagad Personal: +88018XXXXXXXX&#10;Binance Pay ID: 12345678"
                           className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white font-mono focus:outline-none"
                         />
@@ -2248,8 +2319,8 @@ export default function AdminPanel({
                         <label className="text-[11px] text-slate-400 block font-bold">Default Telegram Support Bot URI Link</label>
                         <input
                           type="text"
-                          value={systemSettings.telegramBotUrl}
-                          onChange={e => handleToggleSettingsOption('telegramBotUrl', e.target.value)}
+                          value={currentSettings.telegramBotUrl || ''}
+                          onChange={e => handleDraftSettingsChange('telegramBotUrl', e.target.value)}
                           placeholder="https://t.me/TaskEarnProSupport_bot"
                           className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white font-mono focus:outline-none"
                         />
@@ -2264,8 +2335,8 @@ export default function AdminPanel({
                             type="number"
                             min="100"
                             max="50000"
-                            value={(systemSettings as any).coinsPerDollar ?? 1000}
-                            onChange={e => handleToggleSettingsOption('coinsPerDollar', parseInt(e.target.value) || 1000)}
+                            value={(currentSettings as any).coinsPerDollar ?? 1000}
+                            onChange={e => handleDraftSettingsChange('coinsPerDollar', parseInt(e.target.value) || 1000)}
                             className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white font-mono focus:outline-none"
                           />
                           <p className="text-[9.5px] text-slate-500 leading-normal font-mono">Coins required per $1.00 USD (E.g., 1000)</p>
@@ -2277,8 +2348,8 @@ export default function AdminPanel({
                           </label>
                           <input
                             type="text"
-                            value={(systemSettings as any).telegramBotAdUrl ?? ''}
-                            onChange={e => handleToggleSettingsOption('telegramBotAdUrl', e.target.value.trim())}
+                            value={(currentSettings as any).telegramBotAdUrl ?? ''}
+                            onChange={e => handleDraftSettingsChange('telegramBotAdUrl', e.target.value.trim())}
                             placeholder="https://t.me/your_sponsor_ads_bot"
                             className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white font-mono focus:outline-none"
                           />
@@ -2290,8 +2361,8 @@ export default function AdminPanel({
                         <label className="text-[11px] text-slate-400 block font-bold">Admin Support Box Link (সাপোর্ট নেওয়ার জন্য কাস্টম লিংক)</label>
                         <input
                           type="text"
-                          value={systemSettings.supportLink || ''}
-                          onChange={e => handleToggleSettingsOption('supportLink', e.target.value)}
+                          value={currentSettings.supportLink || ''}
+                          onChange={e => handleDraftSettingsChange('supportLink', e.target.value)}
                           placeholder="https://t.me/TaskEarnProSupport"
                           className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white font-mono focus:outline-none"
                         />
@@ -2301,10 +2372,31 @@ export default function AdminPanel({
                         <label className="text-[11px] text-slate-400 block font-bold">Client Dashboard Announcement Note banner</label>
                         <textarea
                           rows={2}
-                          value={systemSettings.announcement}
-                          onChange={e => handleToggleSettingsOption('announcement', e.target.value)}
+                          value={currentSettings.announcement || ''}
+                          onChange={e => handleDraftSettingsChange('announcement', e.target.value)}
                           className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none"
                         />
+                      </div>
+
+                      {/* Save Changes Button bottom of General Settings card */}
+                      <div className="pt-4 border-t border-slate-900 flex justify-end">
+                        <button
+                          type="button"
+                          disabled={JSON.stringify(draftSettings) === JSON.stringify(systemSettings) || isSavingSettings}
+                          onClick={handleSaveSystemSettings}
+                          className={`w-full md:w-auto px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-wider transition duration-250 flex items-center justify-center gap-1.5 ${
+                            JSON.stringify(draftSettings) !== JSON.stringify(systemSettings)
+                              ? 'bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer shadow-lg shadow-indigo-900/40'
+                              : 'bg-slate-900/50 text-slate-550 cursor-not-allowed border border-slate-900'
+                          }`}
+                        >
+                          {isSavingSettings ? (
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Save className="w-4 h-4" />
+                          )}
+                          Save General Settings (সেটিংস পরিবর্তন সেভ করুন)
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -2332,14 +2424,14 @@ export default function AdminPanel({
                         </div>
                         <button
                           type="button"
-                          onClick={() => handleToggleSettingsOption('gameSectionEnabled', systemSettings.gameSectionEnabled !== false ? false : true)}
+                          onClick={() => handleDraftSettingsChange('gameSectionEnabled', currentSettings.gameSectionEnabled !== false ? false : true)}
                           className={`text-[9.5px] font-black uppercase p-1.5 px-3 rounded-lg border transition ${
-                            systemSettings.gameSectionEnabled !== false
+                            currentSettings.gameSectionEnabled !== false
                               ? 'bg-emerald-500/15 border-emerald-900 text-emerald-400'
                               : 'bg-rose-500/15 border-rose-900 text-rose-450'
                           }`}
                         >
-                          {systemSettings.gameSectionEnabled !== false ? 'ENABLED' : 'DISABLED'}
+                          {currentSettings.gameSectionEnabled !== false ? 'ENABLED' : 'DISABLED'}
                         </button>
                       </div>
 
@@ -2347,7 +2439,7 @@ export default function AdminPanel({
                       <div className="p-3 bg-slate-900 border border-slate-850 rounded-2xl space-y-1.5 select-none text-left">
                         <div className="flex justify-between items-center text-xs font-bold leading-normal text-slate-200">
                           <span>Lucky Wheel Spin Cost (স্পিন করতে কয়েন খরচ)</span>
-                          <span className="text-indigo-400 font-black">{systemSettings.gameSpinCost ?? 100} Coins</span>
+                          <span className="text-indigo-400 font-black">{currentSettings.gameSpinCost ?? 100} Coins</span>
                         </div>
                         <p className="text-[10px] text-slate-500 leading-tight">Configure how many virtual earning coins users must pay to spin the dynamic rewards wheel.</p>
                         <input
@@ -2355,8 +2447,8 @@ export default function AdminPanel({
                           min="10"
                           max="500"
                           step="10"
-                          value={systemSettings.gameSpinCost ?? 100}
-                          onChange={e => handleToggleSettingsOption('gameSpinCost', parseInt(e.target.value))}
+                          value={currentSettings.gameSpinCost ?? 100}
+                          onChange={e => handleDraftSettingsChange('gameSpinCost', parseInt(e.target.value) || 100)}
                           className="w-full accent-indigo-550 cursor-pointer mt-1"
                         />
                       </div>
@@ -2365,7 +2457,7 @@ export default function AdminPanel({
                       <div className="p-3 bg-slate-900 border border-slate-850 rounded-2xl space-y-1.5 select-none text-left">
                         <div className="flex justify-between items-center text-xs font-bold leading-normal text-slate-200">
                           <span>Game Reward Multiplier (গেম পুরস্কারের গুণিতক)</span>
-                          <span className="text-amber-400 font-black">x{(systemSettings.gameSpinRewardMultiplier ?? 1.0).toFixed(1)} Payout</span>
+                          <span className="text-amber-400 font-black">x{(currentSettings.gameSpinRewardMultiplier ?? 1.0).toFixed(1)} Payout</span>
                         </div>
                         <p className="text-[10px] text-slate-500 leading-tight font-sans">
                           Scale all game payouts (jackpots, mystery chest credits and scratch card wins) using a global factor rate.
@@ -2375,10 +2467,31 @@ export default function AdminPanel({
                           min="0.5"
                           max="5.0"
                           step="0.5"
-                          value={systemSettings.gameSpinRewardMultiplier ?? 1.0}
-                          onChange={e => handleToggleSettingsOption('gameSpinRewardMultiplier', parseFloat(e.target.value))}
+                          value={currentSettings.gameSpinRewardMultiplier ?? 1.0}
+                          onChange={e => handleDraftSettingsChange('gameSpinRewardMultiplier', parseFloat(e.target.value) || 1.0)}
                           className="w-full accent-amber-550 cursor-pointer mt-1"
                         />
+                      </div>
+
+                      {/* Save Changes Button bottom of Lucky Games card */}
+                      <div className="pt-4 border-t border-slate-900 flex justify-end">
+                        <button
+                          type="button"
+                          disabled={JSON.stringify(draftSettings) === JSON.stringify(systemSettings) || isSavingSettings}
+                          onClick={handleSaveSystemSettings}
+                          className={`w-full md:w-auto px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-wider transition duration-250 flex items-center justify-center gap-1.5 ${
+                            JSON.stringify(draftSettings) !== JSON.stringify(systemSettings)
+                              ? 'bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer shadow-lg shadow-indigo-900/40'
+                              : 'bg-slate-900/50 text-slate-550 cursor-not-allowed border border-slate-900'
+                          }`}
+                        >
+                          {isSavingSettings ? (
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Save className="w-4 h-4" />
+                          )}
+                          Save Game Settings (গেম সেটিংস সেভ করুন)
+                        </button>
                       </div>
                     </div>
                   </div>
