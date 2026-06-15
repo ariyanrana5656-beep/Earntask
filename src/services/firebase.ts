@@ -25,7 +25,11 @@ try {
   // Check if firebase configuration is valid and complete
   if (firebaseConfig && firebaseConfig.projectId && firebaseConfig.apiKey) {
     appInstance = initializeApp(firebaseConfig);
-    dbInstance = getFirestore(appInstance, firebaseConfig.firestoreDatabaseId);
+    if (firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)') {
+      dbInstance = getFirestore(appInstance, firebaseConfig.firestoreDatabaseId);
+    } else {
+      dbInstance = getFirestore(appInstance);
+    }
     authInstance = getAuth(appInstance);
     googleProviderInstance = new GoogleAuthProvider();
     isFirebaseAvailable = true;

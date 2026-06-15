@@ -1,10 +1,11 @@
 {
-  "projectId": "stunning-momentum-c8gvj",
-  "appId": "1:741724696396:web:43cc10a824980b53b469e9",
-  "apiKey": "AIzaSyC5CcufM9esApd4jEi7KGJW9C6X-_h5W_E",
-  "authDomain": "stunning-momentum-c8gvj.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-f7f0f340-d5f7-4294-8fed-af2c4759ebed",
-  "storageBucket": "stunning-momentum-c8gvj.firebasestorage.app",
-  "messagingSenderId": "741724696396",
+  "projectId": "task-earn-pro-b72ed",
+  "appId": "1:392194547881:web:57ec29fb56180d221449b8",
+  "apiKey": "AIzaSyDg3IwFsZVmSsItJ4kfVOYEckss4qUhMLQ",
+  "authDomain": "task-earn-pro-b72ed.firebaseapp.com",
+  "databaseURL": "https://task-earn-pro-b72ed-default-rtdb.firebaseio.com",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "task-earn-pro-b72ed.firebasestorage.app",
+  "messagingSenderId": "392194547881",
   "measurementId": ""
 }
